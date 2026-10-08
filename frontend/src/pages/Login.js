@@ -121,7 +121,7 @@ const Login = () => {
               <div className="relative z-10 flex items-center gap-3">
                 <TriColourRibbon />
                 <span className="text-[10px] font-bold tracking-[0.32em] uppercase text-amber-100/90">
-                  {BRAND.partyShort} · {BRAND.stateName}
+                  {BRAND.stateName}
                 </span>
               </div>
 
@@ -159,19 +159,17 @@ const Login = () => {
                   {BRAND.leaderName}
                 </p>
                 <p className="mt-1 text-[11px] text-amber-100/90 font-medium tracking-[0.32em] uppercase">
-                  Chief Minister · {BRAND.stateName}
+                  {BRAND.leaderTitle}
                 </p>
                 <div className="mx-auto mt-4 h-[2px] w-32 origin-center bg-gradient-to-r from-transparent via-orange-200 to-transparent brand-underline-pulse" />
                 <p className="mt-4 text-sm text-white/85 max-w-sm leading-relaxed">
-                  Real-time social media intelligence for the {BRAND.partyUnit}-led NDA government — mentions, sentiment, alerts &amp; grievances of the people of {BRAND.stateName}.
+                  Real-time social media intelligence for {BRAND.stateName} leadership — mentions, sentiment, alerts &amp; grievances of the people of {BRAND.stateName}.
                 </p>
               </div>
 
               {/* bottom: footer tagline */}
               <div className="relative z-10 flex items-center justify-center gap-2 text-[10px] text-amber-100/90 font-semibold tracking-wider uppercase">
-                <span>{BRAND.partyName}</span>
-                <span className="h-1 w-1 rounded-full bg-amber-200/80" />
-                <span>{BRAND.stateName}</span>
+                <span>{BRAND.appName}</span>
               </div>
             </div>
 
@@ -217,7 +215,7 @@ const Login = () => {
                     Secure Command Access
                   </h2>
                   <p className="text-[11px] text-orange-700/80 font-medium tracking-wide">
-                    {BRAND.partyUnit} · Authorised personnel only
+                    Authorised personnel only
                   </p>
                 </div>
                 <Sparkles className="ml-auto h-4 w-4 text-amber-500 animate-pulse" />

@@ -56,6 +56,11 @@ import { useRbac } from '../contexts/RbacContext';
 import BriefExportDialog from '../components/cmBrief/BriefExportDialog';
 import { BRAND } from '../config/partyMedia';
 
+// The "Your Party" spotlight (a single party's mention count and stance) is
+// hidden on this site, which carries no party branding. The leader-alignment
+// card still shows when a leader is selected.
+const SHOW_PARTY_SPOTLIGHT = false;
+
 /* ── palette ───────────────────────────────────────────────────────────── */
 const POS = '#15803d';
 const NEU = '#64748b';   // slate-500, as APAlertsWidget establishes for neutral
@@ -882,7 +887,7 @@ export default function CMDashboard() {
         </div>
 
         {/* ── B · SPOTLIGHTS ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <div className={`grid grid-cols-1 ${(leader && data?.leader_profile) || SHOW_PARTY_SPOTLIGHT ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 items-stretch`}>
           {/* Eyebrow follows the focus: with a leader selected this panel is
               about THEM, so labelling it "Chief Minister" named the wrong
               person while every other panel had narrowed. */}
@@ -935,7 +940,7 @@ export default function CMDashboard() {
                 <p className="text-[12px] text-slate-500 mt-2">{data.leader_profile.role}</p>
               )}
             </Spotlight>
-          ) : (
+          ) : SHOW_PARTY_SPOTLIGHT ? (
           <Spotlight Icon={Users} accent="#7c3aed" eyebrow="Your Party" title={party?.name || '—'}
             pill={verdict(party?.net, party?.confident)} pillTone={verdictTone(party?.net, party?.confident)}
             figure={n(party?.mentions)} unit="mentions naming the party"
@@ -963,7 +968,7 @@ export default function CMDashboard() {
               )
               : <div className="text-[11.5px] text-slate-400">No mentions named the party</div>}
           </Spotlight>
-          )}
+          ) : null}
 
           <Spotlight Icon={Layers} accent="#0d9488" eyebrow="Stance by source"
             title="Supportive against opposing"

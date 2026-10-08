@@ -2338,7 +2338,7 @@ const Grievances = () => {
                     </DialogHeader>
                     <div className="space-y-3 pt-1">
                         <p className="text-xs text-muted-foreground">
-                            Paste any X / Twitter URL or a tweet id. We'll fetch the tweet, run sentiment classification (RapidAPI ChatGPT-42), and add it to the BJP Chhattisgarh mentions feed.
+                            Paste any X / Twitter URL or a tweet id. We'll fetch the tweet, run sentiment classification (RapidAPI ChatGPT-42), and add it to the Maharashtra mentions feed.
                         </p>
                         <input
                             type="text"
@@ -2370,12 +2370,12 @@ const Grievances = () => {
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <Tag className="h-4 w-4 text-orange-600" /> BJP Chhattisgarh Tracking Keywords
+                            <Tag className="h-4 w-4 text-orange-600" /> Tracking Keywords
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 pt-1">
                         <p className="text-xs text-muted-foreground">
-                            These keywords are what the auto-fetcher searches every 10–30 minutes. Add anything related to CM Vishnu Deo Sai / BJP Chhattisgarh — names, hashtags, opposition keywords, constituency landmarks. English, Hindi and Chhattisgarhi (Devanagari or romanised) all work.
+                            These keywords are what the auto-fetcher searches every 10–30 minutes. Add anything related to the monitored Maharashtra leaders — names, hashtags, opposition keywords, constituency landmarks. English, Marathi and Hindi (Devanagari or romanised) all work.
                         </p>
                         <div className="flex gap-2">
                             <input

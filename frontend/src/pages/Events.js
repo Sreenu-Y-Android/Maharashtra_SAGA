@@ -41,7 +41,7 @@ const splitKeywords = (value) => {
 const openPrintableReport = ({ event, stats, content, alerts }) => {
   const safe = (v) => (v === null || v === undefined ? '' : String(v));
   const companyLogoUrl = `${window.location.origin}/Logo.png`;
-  const partyLogoUrl = `${window.location.origin}/party-logo.png`;
+  const partyLogoUrl = `${window.location.origin}/app-mark.png`;
 
   const html = `<!doctype html>
 <html>
@@ -184,7 +184,7 @@ const buildReportRows = ({ calendarEvents, events }) => {
 const openPrintableEventsList = ({ events, calendarEvents }) => {
   const rows = buildReportRows({ calendarEvents, events });
   const companyLogoUrl = `${window.location.origin}/Logo.png`;
-  const partyLogoUrl = `${window.location.origin}/party-logo.png`;
+  const partyLogoUrl = `${window.location.origin}/app-mark.png`;
   const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' });
   const html = `<!doctype html>
 <html>
