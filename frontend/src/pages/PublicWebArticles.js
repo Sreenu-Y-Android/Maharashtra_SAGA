@@ -12,12 +12,12 @@ import { RssNewsCard } from '../components/grievances/RssNewsCard';
 import { STATE_DISTRICTS } from '../data/stateMLAs';
 
 const SUGGESTED_QUERIES = [
-  'Vishnu Deo Sai Chhattisgarh development',
-  'Chhattisgarh paddy procurement farmers',
-  'Bastar Naxal operation surrender',
-  'Mahtari Vandan Yojana beneficiaries Chhattisgarh',
-  'Hasdeo Arand coal mining',
-  'BJP Chhattisgarh 2028 assembly election preparations'
+  'Eknath Shinde Maharashtra development',
+  'Maharashtra farmer loan waiver drought relief',
+  'MPSC recruitment students protest',
+  'Ladki Bahin Yojana beneficiaries Maharashtra',
+  'Mumbai metro and coastal road projects',
+  'Maharashtra local body election preparations'
 ];
 
 // District filter options — STATE_DISTRICTS matches the district names the Blura
@@ -227,7 +227,7 @@ const PublicWebArticles = () => {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Web Articles & News Feeds</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Live updates and keyword triaging from Chhattisgarh & National RSS feeds.
+              Live updates and keyword triaging from Maharashtra & National RSS feeds.
             </p>
           </div>
         </div>

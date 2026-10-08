@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { cn } from '../../lib/utils';
 import { Card } from '../ui/card';
+import { displayLeaderName } from '../../config/partyMedia';
 
 /* ═══════════════════════════════════════════════════════════════ */
 /*                  PLATFORM ICONS & COMPONENTS                   */
@@ -155,7 +156,7 @@ export const GrievanceTopNavbar = ({
                                 >
                                     <Users className="h-3.5 w-3.5" />
                                     <span className="truncate max-w-[160px]">
-                                        {selectedLeader ? selectedLeader.name : 'Leader'}
+                                        {selectedLeader ? displayLeaderName(selectedLeader.name) : 'Leader'}
                                     </span>
                                     <ChevronDown className="h-4 w-4 opacity-50" />
                                 </Button>
@@ -189,7 +190,7 @@ export const GrievanceTopNavbar = ({
                                         )}
                                     >
                                         <div className="flex flex-col">
-                                            <span>{l.name}</span>
+                                            <span>{displayLeaderName(l.name)}</span>
                                             {l.handle && <span className="text-[11px] text-slate-400">@{l.handle}</span>}
                                         </div>
                                     </DropdownMenuItem>

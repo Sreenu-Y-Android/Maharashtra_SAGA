@@ -62,13 +62,13 @@ const PageLoader = () => (
     <div className="relative">
       <img
         src={LOCAL_LOGO}
-        alt={`${BRAND.partyShort} logo`}
+        alt={`${BRAND.appName} logo`}
         className="h-16 w-16 rounded-full object-contain bg-white p-1.5 border-2 border-orange-500 shadow-lg"
       />
       <div className="absolute inset-0 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
     </div>
     <div className="flex flex-col items-center gap-1">
-      <span className="text-sm font-bold text-slate-700 tracking-wider uppercase">{BRAND.appName} · {BRAND.partyUnit}</span>
+      <span className="text-sm font-bold text-slate-700 tracking-wider uppercase">{BRAND.appName}</span>
       <span className="text-[11px] text-slate-400 tracking-widest uppercase">{BRAND.tagline}</span>
     </div>
   </div>

@@ -1,8 +1,8 @@
 /**
  * Maharashtra Political Watch — branding and media catalogue for the client:
- * leadership monitoring for Maharashtra, framed around the Chief Minister
- * (CM Devendra Fadnavis; BJP leads the governing Mahayuti). The monitored
- * leaders span several parties across government and opposition.
+ * leadership monitoring for Maharashtra, presented under Eknath Shinde. No
+ * party branding: the monitored leaders span several parties across
+ * government and opposition.
  *
  * Remote images use Wikipedia's stable Special:FilePath redirect (always the
  * current version of a Commons file; every file name below was checked to
@@ -21,29 +21,40 @@ export const BRAND = {
   appName: 'Maharashtra Political Watch',
   appShortName: 'MH WATCH',
   tagline: 'Social Media Intelligence for Maharashtra Leadership',
-  partyName: 'Bharatiya Janata Party',
-  partyShort: 'BJP',
-  partyUnit: 'BJP Maharashtra',
+  // No party branding on this site — left empty on purpose.
+  partyName: '',
+  partyShort: '',
+  partyUnit: '',
   stateName: 'Maharashtra',
-  leaderName: 'Devendra Fadnavis',
-  leaderTitle: 'Chief Minister of Maharashtra',
+  leaderName: 'Shri. Eknath Shinde',
+  leaderTitle: 'Deputy Chief Minister of Maharashtra',
   constituencyCount: 288,
   lokSabhaCount: 48,
 };
 
+/* ─── Default leader focus ─────────────────────────────────────────── */
+// The client's main agenda: the Leader filter on the Intelligence Brief,
+// Mentions, Alerts and Reports starts on this leader. "All leaders" stays
+// one click away. `key` matches backend data/mh_leaders.json.
+export const DEFAULT_MH_LEADER = { key: 'mh-eknath-shinde', name: 'Eknath Shinde' };
+
+/* ─── Respectful names ─────────────────────────────────────────────── */
+// How the site writes these leaders' names wherever it shows them as a
+// label (login, dropdowns, chips, the brief, report titles). Filter values
+// and data matching keep the plain name; quoted post text is never changed.
+export const LEADER_HONORIFICS = { 'Eknath Shinde': 'Shri. Eknath Shinde' };
+export const displayLeaderName = (name) => LEADER_HONORIFICS[String(name || '').trim()] || name;
+/** Generated sentences: the honorific wherever the bare name appears. */
+export const withHonorifics = (text) => (typeof text !== 'string' ? text : Object.entries(LEADER_HONORIFICS)
+  .reduce((out, [bare, full]) => out.replace(new RegExp(`(?<!Shri\\.?\\s?)${bare}`, 'g'), full), text));
+
 /* ─── Portraits of the client leadership ─────────────────────────── */
-// Fadnavis: official GODL-India portrait. Shinde: CC BY-SA 4.0.
+// Eknath Shinde: CC BY-SA 4.0 (Wikimedia Commons).
 export const PARTY_PORTRAITS = [
   {
     id: 'portrait-primary',
-    src: wiki('Shri_Devendra_Gangadharrao_Fadnavis.jpg'),
-    alt: 'Devendra Fadnavis — Chief Minister of Maharashtra',
-    caption: 'Chief Minister · Maharashtra',
-  },
-  {
-    id: 'portrait-deputy-cm',
     src: wiki('Eknath_Shinde_SS.jpg'),
-    alt: 'Eknath Shinde — Deputy Chief Minister of Maharashtra',
+    alt: 'Shri. Eknath Shinde — Deputy Chief Minister of Maharashtra',
     caption: 'Deputy Chief Minister · Maharashtra',
   },
 ];
@@ -80,14 +91,15 @@ export const STATE_GALLERY = [
 ];
 
 /* ─── Party visual marks ─────────────────────────────────────────── */
+// No party flag or logo on this site; the app mark stands in.
 export const PARTY_MARK = {
-  flag: wiki('Bharatiya_Janata_Party_Flag.jpg'),
-  logo: wiki('Logo_of_the_Bharatiya_Janata_Party.svg'),
+  flag: null,
+  logo: '/app-mark.png',
 };
 
 /* ─── Local fallback served from /public ─────────────────────────── */
 export const LOCAL_FALLBACK = '/cm-portrait.jpg';
-export const LOCAL_LOGO = '/party-logo.png';
+export const LOCAL_LOGO = '/app-mark.png';
 
 /* ─── Key constituencies for the client ──────────────────────────── */
 export const KEY_CONSTITUENCIES = [

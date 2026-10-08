@@ -51,12 +51,12 @@ const CATEGORIES = [
 ];
 
 const EXAMPLES = [
-  'Vishnu Deo Sai',
-  'BJP Chhattisgarh',
-  'Mahtari Vandan',
-  'Bhupesh Baghel',
-  'Paddy procurement',
-  'Bastar Naxal'
+  'Eknath Shinde',
+  'Maratha reservation',
+  'MPSC recruitment',
+  'Mumbai metro',
+  'Farmer loan waiver',
+  'Ladki Bahin Yojana'
 ];
 
 const ChipRow = ({ icon: Icon, label, options, value, onChange, valueKey = 'value' }) => (

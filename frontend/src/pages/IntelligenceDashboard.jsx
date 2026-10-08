@@ -58,6 +58,7 @@ import {
   YAxis
 } from 'recharts';
 import api from '../lib/api';
+import { DEFAULT_MH_LEADER, displayLeaderName } from '../config/partyMedia';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { exportAsPNG } from '../lib/chartExportUtils';
@@ -400,7 +401,7 @@ const AlertsIntelligence = ({ data, dateFrom, dateTo }) => {
   const [reportRiskFilter, setReportRiskFilter] = useState('all');
   const [reportTopicFilter, setReportTopicFilter] = useState('all');
   // One monitored leader: alerts on posts naming, or posted by, them.
-  const [reportLeaderFilter, setReportLeaderFilter] = useState('all');
+  const [reportLeaderFilter, setReportLeaderFilter] = useState(DEFAULT_MH_LEADER.key);
   const mhLeaders = useMhLeaders('/alerts/mh-leaders');
   const [topicCounts, setTopicCounts] = useState([]);
   const [alertsPage, setAlertsPage] = useState(1);
@@ -1041,7 +1042,7 @@ const AlertsIntelligence = ({ data, dateFrom, dateTo }) => {
               <select value={reportLeaderFilter} onChange={(e) => { setReportLeaderFilter(e.target.value); setAlertsPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-300 focus:outline-none">
                 <option value="all">All Leaders</option>
                 {mhLeaders.map((l) => (
-                  <option key={l.key} value={l.key}>{l.name}</option>
+                  <option key={l.key} value={l.key}>{displayLeaderName(l.name)}</option>
                 ))}
               </select>
             )}
@@ -1753,7 +1754,7 @@ const GrievancesIntelligence = ({ data, dateFrom, dateTo }) => {
   const [reportCategoryFilter, setReportCategoryFilter] = useState('all');
   const [reportTopicFilter, setReportTopicFilter] = useState('all');
   // One monitored leader: posts naming, or posted by, them.
-  const [reportLeaderFilter, setReportLeaderFilter] = useState('all');
+  const [reportLeaderFilter, setReportLeaderFilter] = useState(DEFAULT_MH_LEADER.key);
   const mhLeaders = useMhLeaders('/grievances/mh-leaders');
   const [availableTopics, setAvailableTopics] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]);
@@ -2244,7 +2245,7 @@ const GrievancesIntelligence = ({ data, dateFrom, dateTo }) => {
               <select value={reportLeaderFilter} onChange={(e) => { setReportLeaderFilter(e.target.value); setGrievancesPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-300 focus:outline-none">
                 <option value="all">All Leaders</option>
                 {mhLeaders.map((l) => (
-                  <option key={l.key} value={l.key}>{l.name}</option>
+                  <option key={l.key} value={l.key}>{displayLeaderName(l.name)}</option>
                 ))}
               </select>
             )}

@@ -131,7 +131,7 @@ const Layout = () => {
                   {BRAND.appName}
                 </h1>
                 <span className="hidden sm:block text-[9px] lg:text-[10px] text-orange-50 font-semibold tracking-widest uppercase">
-                  {BRAND.partyUnit} Leadership Monitoring · {BRAND.stateName}
+                  Leadership Monitoring · {BRAND.stateName}
                 </span>
               </div>
             </div>

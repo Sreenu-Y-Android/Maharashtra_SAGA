@@ -54,7 +54,12 @@ import api from '../lib/api';
 import { APP_NAVIGATION } from '../config/navigation';
 import { useRbac } from '../contexts/RbacContext';
 import BriefExportDialog from '../components/cmBrief/BriefExportDialog';
-import { BRAND } from '../config/partyMedia';
+import { BRAND, DEFAULT_MH_LEADER, displayLeaderName, withHonorifics } from '../config/partyMedia';
+
+// The "Your Party" spotlight (a single party's mention count and stance) is
+// hidden on this site, which carries no party branding. The leader-alignment
+// card still shows when a leader is selected.
+const SHOW_PARTY_SPOTLIGHT = false;
 
 /* ── palette ───────────────────────────────────────────────────────────── */
 const POS = '#15803d';
@@ -134,13 +139,16 @@ const recLink = (link, links) => {
   return links.mentions(extra);
 };
 
-const makeLinks = (win) => {
+// `mhLeader` carries the brief's leader focus into Mentions / Alerts (a key,
+// or 'all'), so the page opened shows the same posts the figure counted.
+const makeLinks = (win, mhLeader) => {
   const from = ymd(win?.from);
   const to = ymd(win?.to);
+  const lead = mhLeader ? { mh_leader: mhLeader } : {};
   return {
-    mentions: (extra = {}) => `/grievances${qs({ from, to, ...extra })}`,
+    mentions: (extra = {}) => `/grievances${qs({ from, to, ...lead, ...extra })}`,
     articles: (extra = {}) => `/public-web-articles${qs({ from, to, ...extra })}`,
-    alerts: (extra = {}) => `/alerts${qs({ from, to, ...extra })}`,
+    alerts: (extra = {}) => `/alerts${qs({ from, to, ...lead, ...extra })}`,
     // A district figure combines news and social; only Geo Intel shows both.
     district: (name) => `/geographic-intelligence/${encodeURIComponent(name)}`,
   };
@@ -624,7 +632,8 @@ export default function CMDashboard() {
    * districts, handles, alerts, sentiment — is already scoped by the
    * same filter server-side, so this is the whole change.
    */
-  const [leader, setLeader] = useState('');
+  // Starts on the default leader (the client's main agenda); '' = all leaders.
+  const [leader, setLeader] = useState(DEFAULT_MH_LEADER.name);
   /**
    * The dropdown's own list, kept from the UNFILTERED response.
    *
@@ -634,6 +643,15 @@ export default function CMDashboard() {
    * option reachable while a filter is active.
    */
   const [leaderOptions, setLeaderOptions] = useState([]);
+  // The monitored leaders with their keys: the dropdown's list until an
+  // unfiltered load supplies counts (the brief now opens filtered), and the
+  // name → key map the Mentions / Alerts links need.
+  const [mhRoster, setMhRoster] = useState([]);
+  useEffect(() => {
+    api.get('/grievances/mh-leaders')
+      .then((r) => setMhRoster(Array.isArray(r.data?.leaders) ? r.data.leaders : []))
+      .catch(() => setMhRoster([]));
+  }, []);
   // Same gate the sidebar uses, so a pill never offers a page the user
   // cannot open.
   const { hasAccess } = useRbac();
@@ -672,7 +690,8 @@ export default function CMDashboard() {
     + (data?.by_source?.alerts?.total || 0);
   // Built from the window the API reported, so a drill-down always lands on
   // exactly the period this page measured.
-  const links = useMemo(() => makeLinks(data?.window), [data]);
+  const leaderKey = leader ? (mhRoster.find((l) => l.name === leader)?.key || leader) : 'all';
+  const links = useMemo(() => makeLinks(data?.window, leaderKey), [data, leaderKey]);
 
   // The donut stays on social mentions only: an article's tone and a public
   // post's stance are different measurements, and the issue tracker below is
@@ -718,7 +737,7 @@ export default function CMDashboard() {
    * figures under another leader's name.
    */
   const loadingWhat = [
-    leader ? `for ${leader}` : 'across all leaders',
+    leader ? `for ${displayLeaderName(leader)}` : 'across all leaders',
     handle ? `from @${handle}` : null,
     `over the last ${days} days`,
   ].filter(Boolean).join(' ');
@@ -782,13 +801,13 @@ export default function CMDashboard() {
                 any with no mentions this window — a quiet leader is exactly
                 the one someone wants to check, and the brief reports the
                 nil return rather than showing an empty page. */}
-            {(leaderOptions || []).length > 0 && (
+            {(leaderOptions.length ? leaderOptions : mhRoster).length > 0 && (
               <select value={leader} onChange={(e) => setLeader(e.target.value)}
                 className="px-3 py-2 bg-white rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-700 max-w-[220px]">
                 <option value="">All leaders</option>
-                {leaderOptions.map((l) => (
+                {(leaderOptions.length ? leaderOptions : mhRoster).map((l) => (
                   <option key={l.name} value={l.name}>
-                    {l.name}{l.mentions ? ` · ${l.mentions}` : ' · 0'}
+                    {displayLeaderName(l.name)}{l.mentions == null ? '' : ` · ${l.mentions || 0}`}
                   </option>
                 ))}
               </select>
@@ -834,7 +853,7 @@ export default function CMDashboard() {
         {leader && data?.leader_profile && (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-4 py-2.5 rounded-lg
                           bg-slate-50 border border-slate-200 text-[12.5px]">
-            <span className="font-semibold text-slate-900">{data.leader_profile.leader}</span>
+            <span className="font-semibold text-slate-900">{displayLeaderName(data.leader_profile.leader)}</span>
             {data.leader_profile.role && (
               <span className="text-slate-600">{data.leader_profile.role}</span>
             )}
@@ -882,13 +901,13 @@ export default function CMDashboard() {
         </div>
 
         {/* ── B · SPOTLIGHTS ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <div className={`grid grid-cols-1 ${(leader && data?.leader_profile) || SHOW_PARTY_SPOTLIGHT ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 items-stretch`}>
           {/* Eyebrow follows the focus: with a leader selected this panel is
               about THEM, so labelling it "Chief Minister" named the wrong
               person while every other panel had narrowed. */}
           <Spotlight Icon={Landmark} accent="#2563eb"
             eyebrow={leader ? (p?.role || 'Leader') : 'Chief Minister'}
-            title={p?.name || '—'}
+            title={displayLeaderName(p?.name) || '—'}
             pill={verdict(p?.net, p?.confident)} pillTone={verdictTone(p?.net, p?.confident)}
             figure={n(p?.mentions)} unit="mentions naming them"
             footer={null}>
@@ -925,7 +944,7 @@ export default function CMDashboard() {
               figure={n(p?.mentions)} unit="mentions in this window"
               footer={null}>
               <p className="text-[12.5px] text-slate-600 leading-relaxed">
-                {data.leader_profile.leader} is counted as
+                {displayLeaderName(data.leader_profile.leader)} is counted as
                 {data.leader_profile.alignment === 'ally'
                   ? ' part of the ruling alliance, so criticism of them is adverse to us.'
                   : ' opposition, so criticism of them is not adverse to us — the sentiment'
@@ -935,7 +954,7 @@ export default function CMDashboard() {
                 <p className="text-[12px] text-slate-500 mt-2">{data.leader_profile.role}</p>
               )}
             </Spotlight>
-          ) : (
+          ) : SHOW_PARTY_SPOTLIGHT ? (
           <Spotlight Icon={Users} accent="#7c3aed" eyebrow="Your Party" title={party?.name || '—'}
             pill={verdict(party?.net, party?.confident)} pillTone={verdictTone(party?.net, party?.confident)}
             figure={n(party?.mentions)} unit="mentions naming the party"
@@ -963,7 +982,7 @@ export default function CMDashboard() {
               )
               : <div className="text-[11.5px] text-slate-400">No mentions named the party</div>}
           </Spotlight>
-          )}
+          ) : null}
 
           <Spotlight Icon={Layers} accent="#0d9488" eyebrow="Stance by source"
             title="Supportive against opposing"
@@ -1100,7 +1119,7 @@ export default function CMDashboard() {
                     style={{ background: `${col}0d`, borderLeft: `3px solid ${col}` }}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="text-[12px] font-semibold leading-snug" style={{ color: col }}>
-                        {d.headline}
+                        {withHonorifics(d.headline)}
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-[13px] font-bold tabular-nums leading-none" style={{ color: col }}>
@@ -1128,7 +1147,7 @@ export default function CMDashboard() {
                     )}
 
                     <div className="text-[11px] text-slate-800 mt-1.5 leading-relaxed">
-                      <span className="text-slate-400">Do: </span>{d.action}
+                      <span className="text-slate-400">Do: </span>{withHonorifics(d.action)}
                       {/* Say plainly which advice was written from the evidence
                           by the model and which is a standing template. */}
                       {d.action_source === 'model' && (
