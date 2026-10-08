@@ -9,6 +9,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  FileBarChart,
   Camera,
   CheckCircle2,
   ChevronRight,
@@ -65,6 +66,7 @@ import { exportAsPNG } from '../lib/chartExportUtils';
 
 const EventsReportEmbed = lazy(() => import('./EventsReport'));
 const XBulkActionsEmbed = lazy(() => import('../components/reports/XBulkActions'));
+const MonitoringReportsEmbed = lazy(() => import('./subjectReports/MonitoringReportsTab'));
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -85,6 +87,7 @@ const TABS = [
   { key: 'alerts', label: 'Alerts Reports', icon: AlertTriangle, color: '#3b82f6', bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-700' },
   { key: 'grievances', label: 'Grievances Reports', icon: MessageSquare, color: '#f59e0b', bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700' },
   { key: 'profiles', label: 'Profiles Reports', icon: UserSearch, color: '#8b5cf6', bg: 'bg-violet-50', border: 'border-violet-100', text: 'text-violet-700' },
+  { key: 'monitoring', label: 'Monitoring Reports', icon: FileBarChart, color: '#1e3a5f', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-800' },
   { key: 'events', label: 'Events Report', icon: CalendarDays, color: '#10b981', bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700' },
   { key: 'xactions', label: 'X Bulk Actions', icon: Twitter, color: '#0ea5e9', bg: 'bg-sky-50', border: 'border-sky-100', text: 'text-sky-700' }
 ];
@@ -2882,7 +2885,7 @@ const IntelligenceDashboard = () => {
   const activeTabMeta = useMemo(() => TABS.find(t => t.key === activeTab) || TABS[0], [activeTab]);
 
   const fetchData = useCallback(async (tab, customFrom = dateFrom, customTo = dateTo) => {
-    if (tab === 'events' || tab === 'xactions') { setLoading(false); return; }
+    if (tab === 'events' || tab === 'xactions' || tab === 'monitoring') { setLoading(false); return; }
     setLoading(true);
     setError('');
     try {
@@ -3070,6 +3073,16 @@ const IntelligenceDashboard = () => {
             </div>
           }>
             <EventsReportEmbed />
+          </Suspense>
+        )}
+
+        {activeTab === 'monitoring' && (
+          <Suspense fallback={
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-500 border-t-transparent" />
+            </div>
+          }>
+            <MonitoringReportsEmbed />
           </Suspense>
         )}
 

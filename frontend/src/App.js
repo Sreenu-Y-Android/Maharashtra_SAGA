@@ -49,6 +49,7 @@ const ConstituencyLogins = lazy(() => import('./pages/ConstituencyLogins'));
 const DeepfakeAnalysis = lazy(() => import('./pages/Deepfake/DeepfakeAnalysis'));
 const Telegram = lazy(() => import('./pages/Telegram'));
 const UnrestPredictor = lazy(() => import('./pages/UnrestPredictor'));
+const SubjectReportPrint = lazy(() => import('./pages/subjectReports/PrintReport'));
 const EventsReport = lazy(() => import('./pages/EventsReport'));
 const SearchAnalytics = lazy(() => import('./pages/SearchAnalytics'));
 const PublicWebArticles = lazy(() => import('./pages/PublicWebArticles'));
@@ -91,6 +92,8 @@ function App() {
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/login" element={<Login />} />
+                  {/* Print view of a monitoring report; the server's PDF renderer opens it. */}
+                  <Route path="/subject-reports/print/:reportId" element={<ProtectedRoute><SubjectReportPrint /></ProtectedRoute>} />
                   <Route
                     path=""
                     element={

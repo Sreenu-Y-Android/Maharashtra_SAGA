@@ -98,6 +98,8 @@ app.use('/api/telegram', require('./routes/telegramRoutes'));
 app.use('/api/unrest', require('./routes/unrest.routes'));
 app.use('/api/news',  require('./routes/newsRoutes'));
 app.use('/api/intelligence-reports', require('./routes/intelligenceReportRoutes'));
+// Monitoring reports (presentation, executive, detailed, detailed + posts) on the whole monitored conversation.
+app.use('/api/subject-reports', require('./routes/subjectReportRoutes'));
 app.use('/api/search-trends', require('./routes/searchTrends'));
 app.use('/api/constituency-intel', require('./routes/constituencyIntelligenceRoutes'));
 app.use('/api/geo-intel', require('./routes/geoIntelRoutes'));
