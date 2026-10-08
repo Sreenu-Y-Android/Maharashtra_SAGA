@@ -54,7 +54,7 @@ import api from '../lib/api';
 import { APP_NAVIGATION } from '../config/navigation';
 import { useRbac } from '../contexts/RbacContext';
 import BriefExportDialog from '../components/cmBrief/BriefExportDialog';
-import { BRAND, DEFAULT_MH_LEADER } from '../config/partyMedia';
+import { BRAND, DEFAULT_MH_LEADER, displayLeaderName, withHonorifics } from '../config/partyMedia';
 
 // The "Your Party" spotlight (a single party's mention count and stance) is
 // hidden on this site, which carries no party branding. The leader-alignment
@@ -737,7 +737,7 @@ export default function CMDashboard() {
    * figures under another leader's name.
    */
   const loadingWhat = [
-    leader ? `for ${leader}` : 'across all leaders',
+    leader ? `for ${displayLeaderName(leader)}` : 'across all leaders',
     handle ? `from @${handle}` : null,
     `over the last ${days} days`,
   ].filter(Boolean).join(' ');
@@ -807,7 +807,7 @@ export default function CMDashboard() {
                 <option value="">All leaders</option>
                 {(leaderOptions.length ? leaderOptions : mhRoster).map((l) => (
                   <option key={l.name} value={l.name}>
-                    {l.name}{l.mentions == null ? '' : ` · ${l.mentions || 0}`}
+                    {displayLeaderName(l.name)}{l.mentions == null ? '' : ` · ${l.mentions || 0}`}
                   </option>
                 ))}
               </select>
@@ -853,7 +853,7 @@ export default function CMDashboard() {
         {leader && data?.leader_profile && (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-4 py-2.5 rounded-lg
                           bg-slate-50 border border-slate-200 text-[12.5px]">
-            <span className="font-semibold text-slate-900">{data.leader_profile.leader}</span>
+            <span className="font-semibold text-slate-900">{displayLeaderName(data.leader_profile.leader)}</span>
             {data.leader_profile.role && (
               <span className="text-slate-600">{data.leader_profile.role}</span>
             )}
@@ -907,7 +907,7 @@ export default function CMDashboard() {
               person while every other panel had narrowed. */}
           <Spotlight Icon={Landmark} accent="#2563eb"
             eyebrow={leader ? (p?.role || 'Leader') : 'Chief Minister'}
-            title={p?.name || '—'}
+            title={displayLeaderName(p?.name) || '—'}
             pill={verdict(p?.net, p?.confident)} pillTone={verdictTone(p?.net, p?.confident)}
             figure={n(p?.mentions)} unit="mentions naming them"
             footer={null}>
@@ -944,7 +944,7 @@ export default function CMDashboard() {
               figure={n(p?.mentions)} unit="mentions in this window"
               footer={null}>
               <p className="text-[12.5px] text-slate-600 leading-relaxed">
-                {data.leader_profile.leader} is counted as
+                {displayLeaderName(data.leader_profile.leader)} is counted as
                 {data.leader_profile.alignment === 'ally'
                   ? ' part of the ruling alliance, so criticism of them is adverse to us.'
                   : ' opposition, so criticism of them is not adverse to us — the sentiment'
@@ -1119,7 +1119,7 @@ export default function CMDashboard() {
                     style={{ background: `${col}0d`, borderLeft: `3px solid ${col}` }}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="text-[12px] font-semibold leading-snug" style={{ color: col }}>
-                        {d.headline}
+                        {withHonorifics(d.headline)}
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-[13px] font-bold tabular-nums leading-none" style={{ color: col }}>
@@ -1147,7 +1147,7 @@ export default function CMDashboard() {
                     )}
 
                     <div className="text-[11px] text-slate-800 mt-1.5 leading-relaxed">
-                      <span className="text-slate-400">Do: </span>{d.action}
+                      <span className="text-slate-400">Do: </span>{withHonorifics(d.action)}
                       {/* Say plainly which advice was written from the evidence
                           by the model and which is a standing template. */}
                       {d.action_source === 'model' && (

@@ -44,6 +44,15 @@
  * totals will eventually disagree with the screen it claims to reproduce.
  */
 
+// Respectful form of a leader's name wherever this file prints it as a label
+// (kept inline: this file has no imports). Mirrors LEADER_HONORIFICS in
+// config/partyMedia.js. Quoted post text is never changed.
+const LEADER_HONORIFICS = { 'Eknath Shinde': 'Shri. Eknath Shinde' };
+const hon = (name) => LEADER_HONORIFICS[String(name || '').trim()] || name;
+const honText = (text) => (typeof text !== 'string' ? text : Object.entries(LEADER_HONORIFICS)
+    .reduce((out, [bare, full]) => out.replace(new RegExp(`(?<!Shri\\.?\\s?)${bare}`, 'g'), full), text));
+
+
 const asArray = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -225,7 +234,7 @@ export const buildBriefReportHtml = (data, opts = {}) => {
     const leaderSentimentHtml = (() => {
         if (!ls) return '';
         const t = ls.targeted || {};
-        const nm = esc(ls.leader);
+        const nm = esc(hon(ls.leader));
         const from = ls.coverage_from ? fmtDate(ls.coverage_from) : null;
         const head = t.total
             ? `<p>Of <b>${n(t.total)}</b> public posts aimed at <b>${nm}</b>, `
@@ -473,7 +482,7 @@ export const buildBriefReportHtml = (data, opts = {}) => {
         actions.push([`Monitor the adverse narrative around ${esc(adverseLeader.name)} ${label.next}`, '2']);
     }
     for (const d of asArray(data?.decisions).slice(0, 3)) {
-        if (d.action) actions.push([esc(d.action), '—']);
+        if (d.action) actions.push([esc(honText(d.action)), '—']);
     }
     const actionRows = actions.slice(0, 8).map((a, i) => [
         String(i + 1), a[0], esc(a[1]),
@@ -753,7 +762,7 @@ export const buildBriefReportHtml = (data, opts = {}) => {
         execLines.map((l) => `<p>${l}</p>`).join('')
         + (execStats ? `<div class="stats">${execStats}</div>` : ''))}
 
-  ${ls ? section('1A', `Sentiment toward ${leaderFocus || ls.leader}`, leaderSentimentHtml) : ''}
+  ${ls ? section('1A', `Sentiment toward ${hon(leaderFocus || ls.leader)}`, leaderSentimentHtml) : ''}
 
   ${noCoverage ? section('2', 'What was monitored', `
     <p>This report covers <b>${esc(leaderFocus)}</b> only. The same collection ran

@@ -58,7 +58,7 @@ import {
   YAxis
 } from 'recharts';
 import api from '../lib/api';
-import { DEFAULT_MH_LEADER } from '../config/partyMedia';
+import { DEFAULT_MH_LEADER, displayLeaderName } from '../config/partyMedia';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { exportAsPNG } from '../lib/chartExportUtils';
@@ -1042,7 +1042,7 @@ const AlertsIntelligence = ({ data, dateFrom, dateTo }) => {
               <select value={reportLeaderFilter} onChange={(e) => { setReportLeaderFilter(e.target.value); setAlertsPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-300 focus:outline-none">
                 <option value="all">All Leaders</option>
                 {mhLeaders.map((l) => (
-                  <option key={l.key} value={l.key}>{l.name}</option>
+                  <option key={l.key} value={l.key}>{displayLeaderName(l.name)}</option>
                 ))}
               </select>
             )}
@@ -2245,7 +2245,7 @@ const GrievancesIntelligence = ({ data, dateFrom, dateTo }) => {
               <select value={reportLeaderFilter} onChange={(e) => { setReportLeaderFilter(e.target.value); setGrievancesPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-300 focus:outline-none">
                 <option value="all">All Leaders</option>
                 {mhLeaders.map((l) => (
-                  <option key={l.key} value={l.key}>{l.name}</option>
+                  <option key={l.key} value={l.key}>{displayLeaderName(l.name)}</option>
                 ))}
               </select>
             )}

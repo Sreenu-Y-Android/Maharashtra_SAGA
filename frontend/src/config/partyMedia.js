@@ -26,7 +26,7 @@ export const BRAND = {
   partyShort: '',
   partyUnit: '',
   stateName: 'Maharashtra',
-  leaderName: 'Eknath Shinde',
+  leaderName: 'Shri. Eknath Shinde',
   leaderTitle: 'Deputy Chief Minister of Maharashtra',
   constituencyCount: 288,
   lokSabhaCount: 48,
@@ -38,13 +38,23 @@ export const BRAND = {
 // one click away. `key` matches backend data/mh_leaders.json.
 export const DEFAULT_MH_LEADER = { key: 'mh-eknath-shinde', name: 'Eknath Shinde' };
 
+/* ─── Respectful names ─────────────────────────────────────────────── */
+// How the site writes these leaders' names wherever it shows them as a
+// label (login, dropdowns, chips, the brief, report titles). Filter values
+// and data matching keep the plain name; quoted post text is never changed.
+export const LEADER_HONORIFICS = { 'Eknath Shinde': 'Shri. Eknath Shinde' };
+export const displayLeaderName = (name) => LEADER_HONORIFICS[String(name || '').trim()] || name;
+/** Generated sentences: the honorific wherever the bare name appears. */
+export const withHonorifics = (text) => (typeof text !== 'string' ? text : Object.entries(LEADER_HONORIFICS)
+  .reduce((out, [bare, full]) => out.replace(new RegExp(`(?<!Shri\\.?\\s?)${bare}`, 'g'), full), text));
+
 /* ─── Portraits of the client leadership ─────────────────────────── */
 // Eknath Shinde: CC BY-SA 4.0 (Wikimedia Commons).
 export const PARTY_PORTRAITS = [
   {
     id: 'portrait-primary',
     src: wiki('Eknath_Shinde_SS.jpg'),
-    alt: 'Eknath Shinde — Deputy Chief Minister of Maharashtra',
+    alt: 'Shri. Eknath Shinde — Deputy Chief Minister of Maharashtra',
     caption: 'Deputy Chief Minister · Maharashtra',
   },
 ];

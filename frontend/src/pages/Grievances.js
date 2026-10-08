@@ -51,7 +51,7 @@ import { RssNewsCard } from '../components/grievances/RssNewsCard';
 import { YouTubeLiveTab } from '../components/grievances/YouTubeLiveTab';
 import { useRbac } from '../contexts/RbacContext';
 import { canManageRestrictedGrievanceUi } from '../lib/grievanceUiPermissions';
-import { DEFAULT_MH_LEADER } from '../config/partyMedia';
+import { DEFAULT_MH_LEADER, displayLeaderName } from '../config/partyMedia';
 
 /** ?mh_leader: absent ⇒ the default leader; 'all' ⇒ every leader; else that key. */
 const mhLeaderFromUrl = (v) => (v === 'all' ? null : (v || DEFAULT_MH_LEADER.key));
@@ -2582,7 +2582,7 @@ const Grievances = () => {
                     <span className="text-violet-700 font-medium">Filtered by:</span>
                     {mhLeaderFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-semibold text-[11px]">
-                            Leader: {mhLeaders.find((l) => l.key === mhLeaderFilter)?.name || mhLeaderFilter}
+                            Leader: {displayLeaderName(mhLeaders.find((l) => l.key === mhLeaderFilter)?.name) || mhLeaderFilter}
                             <button type="button" onClick={() => updateURLParams({ mh_leader: 'all' })} className="ml-0.5 hover:opacity-70">&times;</button>
                         </span>
                     )}

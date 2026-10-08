@@ -20,6 +20,15 @@
  * source. So it must stay free of imports.
  */
 
+// Respectful form of a leader's name wherever this file prints it as a label
+// (kept inline: this file has no imports). Mirrors LEADER_HONORIFICS in
+// config/partyMedia.js. Quoted post text is never changed.
+const LEADER_HONORIFICS = { 'Eknath Shinde': 'Shri. Eknath Shinde' };
+const hon = (name) => LEADER_HONORIFICS[String(name || '').trim()] || name;
+const honText = (text) => (typeof text !== 'string' ? text : Object.entries(LEADER_HONORIFICS)
+    .reduce((out, [bare, full]) => out.replace(new RegExp(`(?<!Shri\\.?\\s?)${bare}`, 'g'), full), text));
+
+
 const asArray = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const num = (v) => Number(v) || 0;
@@ -149,7 +158,7 @@ export const buildMonitoringReportHtml = (data, opts = {}) => {
     /* ── title, period strip, tiles ───────────────────────────────── */
     const header = `<header class="hero">
       <div class="eyebrow">Public discussion monitoring report</div>
-      <h1>${esc(m.name || 'All monitored leaders')}</h1>
+      <h1>${esc(hon(m.name) || 'All monitored leaders')}</h1>
       ${m.role ? `<div class="role">${esc(m.role)}</div>` : ''}
       <p class="sub">${esc([m.party, m.base, m.state].filter(Boolean).join(' · '))}${platforms.length ? `<br>Public discussion on ${esc(platforms.map((p) => p.name).join(', '))}` : ''}</p>
     </header>
@@ -378,7 +387,7 @@ export const buildMonitoringReportHtml = (data, opts = {}) => {
 
     /* ── summary ──────────────────────────────────────────────────── */
     const summaryItems = [
-        `Prepared for: ${m.name || 'All monitored leaders'}${m.role ? `, ${m.role}` : ''}.`,
+        `Prepared for: ${hon(m.name) || 'All monitored leaders'}${m.role ? `, ${m.role}` : ''}.`,
         `Period: ${m.period || ''}.`,
         `Platforms: ${platforms.map((p) => `${p.name} ${n(p.n)}`).join(' · ')}.`,
         `Posts: ${n(m.collected)} collected, ${n(N)} relevant, ${n(m.excluded)} excluded as unrelated.`,
@@ -390,7 +399,7 @@ export const buildMonitoringReportHtml = (data, opts = {}) => {
         + (num(d.review_coverage?.shown) ? `<p class="close"><b>Review.</b> ${num(d.review_coverage.reviewed) === num(d.review_coverage.shown)
             ? `All ${n(d.review_coverage.shown)} posts quoted in this report's tables were individually reviewed for relevance to ${esc(subject)}, tone, stance, risk band and claims; the reviewed reading replaces the automatic one.`
             : `${n(d.review_coverage.reviewed)} of the ${n(d.review_coverage.shown)} posts quoted in this report's tables were individually reviewed; the rest carry the automatic reading.`}</p>` : '')
-        + `<p class="ref">${esc(appName)} · public discussion monitoring · ${esc(m.name || '')} · ${esc(m.period || '')}. Automatic classification can misread sarcasm, quotes and replies; treat individual counts as indicative.</p>`)}</section>`;
+        + `<p class="ref">${esc(appName)} · public discussion monitoring · ${esc(hon(m.name) || '')} · ${esc(m.period || '')}. Automatic classification can misread sarcasm, quotes and replies; treat individual counts as indicative.</p>`)}</section>`;
 
     const css = `
     @page { size: A4; margin: 14mm 12mm 16mm 12mm; }

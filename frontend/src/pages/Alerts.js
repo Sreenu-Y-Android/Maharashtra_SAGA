@@ -22,7 +22,7 @@ import AddSourceModal from '../components/AddSourceModal';
 import { useRbac } from '../contexts/RbacContext';
 import { useAuth } from '../contexts/AuthContext';
 import { canManageRestrictedGrievanceUi } from '../lib/grievanceUiPermissions';
-import { DEFAULT_MH_LEADER } from '../config/partyMedia';
+import { DEFAULT_MH_LEADER, displayLeaderName } from '../config/partyMedia';
 // Same resolver the cards use, so the client-side filter and the rendered badge
 // can never disagree about a record.
 import { getAlertSentiment } from '../lib/sentiment';
@@ -1711,7 +1711,7 @@ const Alerts = () => {
                 <SelectContent>
                   <SelectItem value="all">All Leaders</SelectItem>
                   {mhLeaders.map((l) => (
-                    <SelectItem key={l.key} value={l.key}>{l.name}</SelectItem>
+                    <SelectItem key={l.key} value={l.key}>{displayLeaderName(l.name)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
