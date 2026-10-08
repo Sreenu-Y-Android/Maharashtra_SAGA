@@ -42,7 +42,7 @@ const main = async () => {
         const day = (v, end) => new Date(`${v}T${end ? '23:59:59.999' : '00:00:00.000'}+05:30`);
         const from = day(process.argv[gi + 1], false);
         const to = day(process.argv[gi + 2], true);
-        const report = await SubjectReport.create({ title: profile.subject_name || leader.name, status: 'generating', range_from: from, range_to: to, generated_by: 'cli' });
+        const report = await SubjectReport.create({ title: leader.name, leader_key: leader.key, status: 'generating', range_from: from, range_to: to, generated_by: 'cli' });
         await completeReport(report.id, { profile, leader, from, to });
         const done = await SubjectReport.findOne({ id: report.id }).select('status post_count error').lean();
         console.log(`report ${report.id}: ${done.status}, ${done.post_count} relevant posts${done.error ? ` (${done.error})` : ''}`);

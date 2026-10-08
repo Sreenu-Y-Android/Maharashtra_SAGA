@@ -421,7 +421,7 @@ const ReportBrief = ({ report, workspace, onDownloadPdf }) => {
 
       <H2 n="03">Sentiment and stance</H2>
       <Tiles items={[[fmt(toneOf('positive').count), `Positive (${toneOf('positive').pct}%)`], [fmt(toneOf('neutral').count), `Neutral (${toneOf('neutral').pct}%)`], [fmt(toneOf('negative').count), `Negative (${toneOf('negative').pct}%)`], [fmt(t.relevant), 'Analysed']]} />
-      <p className="text-[12px] italic text-slate-500 mt-2">Tone is measured toward {ev.subject?.name || 'the subject'}: negative includes posts criticising {ev.axis_label || 'the state government'}. Negative is the criticism load, not a threat by itself.</p>
+      <p className="text-[12px] italic text-slate-500 mt-2">Tone is measured {ev.tone?.basis || `toward ${ev.subject?.name || 'the subject'}`}. Negative is the criticism load, not a threat by itself.</p>
       <div className="grid md:grid-cols-2 gap-4 mt-3 text-[12px]">
         {[['Stance toward ' + (ev.subject?.name || 'the subject'), s.stance_toward_subject], ['Stance toward ' + (ev.axis_label || 'the state government'), s.stance_toward_protest]].map(([title, rows]) => (
           <div key={title}>
@@ -433,7 +433,7 @@ const ReportBrief = ({ report, workspace, onDownloadPdf }) => {
 
             {s.tone_sections && <>
         <H2 n="04">Positive, negative and neutral posts</H2>
-        <p className="text-[12px] text-slate-600 mb-3">Each post's tone toward {ev.subject?.name || 'the subject'}, separated. Positive: supports {ev.subject?.name || 'the subject'} or {ev.axis_label || 'the state government'}. Negative: criticises {ev.subject?.name || 'the subject'} or {ev.axis_label || 'the state government'}. Neutral: everything else.</p>
+        <p className="text-[12px] text-slate-600 mb-3">Each post's tone toward {ev.subject?.name || 'the subject'}, separated. Positive: {ev.tone?.positive || `supports ${ev.subject?.name || 'the subject'}`}. Negative: {ev.tone?.negative || `criticises ${ev.subject?.name || 'the subject'}`}. Neutral: everything else, including the subject's own posts.</p>
         <div className="grid md:grid-cols-3 gap-3">
           {s.tone_sections.map((ts) => (
             <div key={ts.key} className="border rounded p-3 break-inside-avoid" style={{ borderTop: `4px solid ${TONE_COLOR[ts.key]}` }}>

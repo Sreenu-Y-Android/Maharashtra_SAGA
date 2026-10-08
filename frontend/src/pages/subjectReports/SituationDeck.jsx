@@ -659,7 +659,7 @@ const SituationDeck = ({ report, workspace }) => {
             threats && ['Explicit threats', `${fmt(threats.at_organisers)} at the opposition + ${fmt(threats.at_subject)} at ${who} or the government side + ${fmt(otherThreats)} others = ${fmt(threats.critical)}. The executive report lists the newest 12.`],
             ex.information && ['Manipulated media', `${fmt(ex.information.misattributed_media)} posts share or dispute doctored, misattributed or AI-generated media (narrative label plus analyst notes).`],
             singleSource.length > 0 && ['Single-source items', `${singleSource.slice(0, 3).map((f) => f.statement.replace(/\.$/, '')).join('; ')}: do not repeat as fact.`],
-            ['"Negative"', `Measures criticism of ${who} or ${ev.axis_label || 'the state government'}, not hostility or threat. Risk bands are model labels, not analyst-reviewed.`],
+            ['"Negative"', `A negative post ${ev.tone?.negative || `criticises ${who}`}; it measures opinion, not hostility or threat. Risk bands are model labels, not analyst-reviewed.`],
           ].filter(Boolean).map(([k, v]) => (
             <tr key={k} style={{ borderBottom: '1px solid #d5dbe6' }}><td style={{ padding: '14px 18px', fontWeight: 700, verticalAlign: 'top' }}>{k}</td><td style={{ padding: '14px 18px', lineHeight: 1.4 }}>{v}</td></tr>
           ))}

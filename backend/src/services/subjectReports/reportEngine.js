@@ -43,12 +43,43 @@ const isPublicAccount = (p) => PUBLIC_ACCOUNT_TYPES.has(p.analysis?.account_type
  *   neutral  — everything else.
  * (stance_toward_protest holds the stance toward the second axis, the state government.)
  */
+const FLIP = { supportive: 'critical', critical: 'supportive' };
 const tone = (p) => {
     const subject = p.analysis?.stance_toward_subject;
-    const axis = p.analysis?.stance_toward_protest;
+    const sign = p.analysis?.axis_sign ?? 1;
+    // For an opposition subject, support for the government counts against them.
+    const raw = p.analysis?.stance_toward_protest;
+    const axis = sign === 1 ? raw : sign === -1 ? (FLIP[raw] || raw) : null;
     if (subject === 'supportive' || (axis === 'supportive' && subject !== 'critical')) return 'positive';
     if (subject === 'critical' || (axis === 'critical' && subject !== 'supportive')) return 'negative';
     return 'neutral';
+};
+
+/** What positive and negative mean for this subject, in words (used across the report text). */
+const toneDefinitions = (name, alignment, axis) => {
+    if (alignment === 'opposition') {
+        return {
+            positive: `supports ${name} or criticises ${axis}`,
+            negative: `criticises ${name} or supports ${axis}`,
+            basis: `toward ${name} (support for ${axis} counts as negative for an opposition leader)`,
+        };
+    }
+    if (alignment === 'ally') {
+        return { positive: `supports ${name} or ${axis}`, negative: `criticises ${name} or ${axis}`, basis: `toward ${name} and ${axis}` };
+    }
+    return { positive: `supports ${name}`, negative: `criticises ${name}`, basis: `toward ${name}` };
+};
+
+/** The matcher the post adapter uses for a subject (a roster leader) and scope. */
+const subjectFor = (leader, scope = 'leader') => {
+    const aliases = [...new Set([...(leader?.aliases || []), leader?.name].filter(Boolean))];
+    return {
+        key: leader?.key || null,
+        rx: aliases.length ? new RegExp(aliases.map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i') : /$^/,
+        handle: leader?.handle || null,
+        alignment: leader?.alignment || 'none',
+        scope,
+    };
 };
 
 /** likes + 2×comments + 3×shares + views/10 */
@@ -565,8 +596,8 @@ const templateProse = (event, s) => {
     const to = dayText(t.last_post_at);
 
     const bottom = [
-        `${from === to ? `On ${from}` : `Between ${from} and ${to}`}, ${num(t.relevant)} relevant public posts (${platforms}) were monitored across ${event.location}, drawing about ${compact(t.engagement)} engagements${t.views ? ` and ${compact(t.views)} views` : ''}.`,
-        `Toward ${subject} and ${event.axis_label}, posts were ${tone('positive').pct}% positive, ${tone('neutral').pct}% neutral and ${tone('negative').pct}% negative.`,
+        `${from === to ? `On ${from}` : `Between ${from} and ${to}`}, ${num(t.relevant)} relevant public posts (${platforms}) ${event.scope === 'leader' ? `named, targeted or came from ${subject}` : `were monitored across ${event.location}`}, drawing about ${compact(t.engagement)} engagements${t.views ? ` and ${compact(t.views)} views` : ''}.`,
+        `Measured ${event.tone.basis}, posts were ${tone('positive').pct}% positive, ${tone('neutral').pct}% neutral and ${tone('negative').pct}% negative.`,
         `Where posts take a position on ${subject}, ${num(st('stance_toward_subject', 'critical').count)} are critical and ${num(st('stance_toward_subject', 'supportive').count)} supportive; ${st('stance_toward_protest', 'supportive').pct}% support ${event.axis_label} and ${st('stance_toward_protest', 'critical').pct}% criticise it.`,
         topNarr.length ? `The leading narratives are ${topNarr.map((n) => `${n.label} (${n.pct}%)`).join(', ')}.` : '',
         `${band('critical')} posts are in the critical risk band and ${band('high')} in the high band${riskRows.length ? `; the most-engaged of them reached ${num(maxRiskReach)} engagements` : ''}.`,
@@ -628,17 +659,24 @@ const METHODOLOGY = [
  * The subject and settings a report is computed against, from the profile and
  * the leader roster.
  */
-const reportContext = (profile, leader, narratives) => ({
-    name: `Public discussion on ${profile.subject_name || leader?.name || 'the subject'}`,
-    short_name: profile.subject_name || leader?.name || 'Monitoring report',
-    description: `Monitored public discussion in Maharashtra, measured toward ${profile.subject_name || leader?.name} and ${profile.axis_label || 'the state government'}.`,
+const reportContext = (profile, leader, narratives, scope) => ({
+    scope,
+    name: scope === 'leader' ? `Public discussion about ${leader?.name}` : `Public discussion in Maharashtra, measured toward ${leader?.name}`,
+    short_name: scope === 'leader' ? (leader?.name || 'Monitoring report') : 'All leaders',
+    description: scope === 'leader'
+        ? `Monitored posts that name or target ${leader?.name}, or come from ${leader?.name}'s own account.`
+        : `Every monitored post in Maharashtra, measured toward ${leader?.name}.`,
+    tone: toneDefinitions(leader?.name || 'the subject', leader?.alignment, profile.axis_label || 'the state government'),
     start_date: null,
     location: 'Maharashtra',
     subject: {
-        name: profile.subject_name || leader?.name || 'the subject',
-        role: profile.subject_role || leader?.role || '',
+        name: leader?.name || 'the subject',
+        role: leader?.role || '',
         aliases: leader?.aliases || [],
-        key: profile.subject_leader_key,
+        key: leader?.key || null,
+        party: leader?.party || null,
+        alignment: leader?.alignment || 'none',
+        handle: leader?.handle || null,
     },
     axis_label: profile.axis_label || 'the state government',
     organisers: [],
@@ -646,25 +684,22 @@ const reportContext = (profile, leader, narratives) => ({
     keywords: leader?.aliases || [],
     hashtags: [],
     narratives,
-    facts: profile.facts || [],
+    // The profile's written guidance and dates belong to its default subject only.
+    facts: leader?.key === profile.subject_leader_key ? profile.facts || [] : [],
     sources: [],
-    watch_items: profile.watch_items || [],
-    briefing: profile.briefing || null,
+    watch_items: leader?.key === profile.subject_leader_key ? profile.watch_items || [] : [],
+    briefing: leader?.key === profile.subject_leader_key ? profile.briefing || null
+        : { ...(profile.briefing ? { disclaimer: profile.briefing.disclaimer } : {}), subject_label: leader?.name },
 });
 
 /** Build the report document for posts published in [from, to]. */
-const buildReportData = async ({ profile, leader, from = null, to = null }) => {
-    const aliases = [...new Set([...(leader?.aliases || []), leader?.name].filter(Boolean))];
-    const subject = {
-        key: profile.subject_leader_key,
-        rx: aliases.length ? new RegExp(aliases.map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i') : /$^/,
-    };
-    const posts = await loadPosts({ from, to }, subject);
+const buildReportData = async ({ profile, leader, scope = 'leader', from = null, to = null }) => {
+    const posts = await loadPosts({ from, to }, subjectFor(leader, scope));
     // Narratives are the issue topics present in the period.
     const topics = new Map();
     posts.forEach((p) => { if (p.analysis.topic) topics.set(p.analysis.narratives[0], p.analysis.topic); });
     const narratives = [...topics.entries()].map(([key, label]) => ({ key, label, description: '' }));
-    const event = reportContext(profile, leader, narratives);
+    const event = reportContext(profile, leader, narratives, scope);
     const stats = computeStats(event, posts);
     const prose = templateProse(event, stats);
 
@@ -705,9 +740,9 @@ const reportFields = (event, stats, data, range) => ({
 });
 
 /** Fill in a report row created earlier with status 'generating'. */
-const completeReport = async (reportId, { profile, leader, from = null, to = null }) => {
+const completeReport = async (reportId, { profile, leader, scope = 'leader', from = null, to = null }) => {
     try {
-        const { stats, data } = await buildReportData({ profile, leader, from, to });
+        const { stats, data } = await buildReportData({ profile, leader, scope, from, to });
         await SubjectReport.updateOne({ id: reportId }, { $set: { status: 'ready', error: null, ...reportFields(data.event, stats, data, { from, to }) } });
     } catch (err) {
         await SubjectReport.updateOne({ id: reportId }, { $set: { status: 'failed', error: err.message } });
@@ -715,4 +750,4 @@ const completeReport = async (reportId, { profile, leader, from = null, to = nul
     }
 };
 
-module.exports = { tone, completeReport, buildReportData, computeStats, templateProse, engagementScore, footageOf, isPublicAccount };
+module.exports = { tone, subjectFor, toneDefinitions, completeReport, buildReportData, computeStats, templateProse, engagementScore, footageOf, isPublicAccount };

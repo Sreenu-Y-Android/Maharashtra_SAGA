@@ -7,7 +7,7 @@
 const SubjectReport = require('../models/SubjectReport');
 const ReportProfile = require('../models/ReportProfile');
 const MH = require('../data/mh_leaders.json');
-const { completeReport, tone, footageOf, isPublicAccount } = require('../services/subjectReports/reportEngine');
+const { completeReport, tone, subjectFor, footageOf, isPublicAccount } = require('../services/subjectReports/reportEngine');
 const { loadPosts } = require('../services/subjectReports/postAdapter');
 const { startPdfJob, getJob } = require('../services/subjectReports/pdfService');
 const { expand } = require('../services/subjectReports/textClean');
@@ -27,13 +27,15 @@ const loadProfile = async () => {
     return { profile, leader };
 };
 
-const subjectMatcher = (profile, leader) => {
-    const aliases = [...new Set([...(leader?.aliases || []), leader?.name].filter(Boolean))];
-    return {
-        key: profile.subject_leader_key,
-        rx: aliases.length ? new RegExp(aliases.map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i') : /$^/,
-    };
-};
+const leaderByKey = (key) => (MH.leaders || []).find((l) => l.key === key) || null;
+
+/**
+ * What a report is about: a single roster leader (only posts about them), or all
+ * leaders (every post, measured toward the profile's default subject).
+ */
+const scopeOf = (profile, leaderKey) => (leaderKey
+    ? { scope: 'leader', leader: leaderByKey(leaderKey) }
+    : { scope: 'all', leader: leaderByKey(profile.subject_leader_key) });
 
 const parseDay = (value, endOfDay) => {
     if (!value) return null;
@@ -52,6 +54,8 @@ const getProfile = async (req, res) => {
             subject: { key: profile.subject_leader_key, name: profile.subject_name || leader?.name, role: profile.subject_role || leader?.role },
             axis_label: profile.axis_label,
             branding: profile.branding || null,
+            // Leaders a report can be about.
+            leaders: (MH.leaders || []).map((l) => ({ key: l.key, name: l.name, role: l.role, party: l.party, alignment: l.alignment })),
         },
         workspace: { name: profile.subject_name || leader?.name || 'Monitoring', branding: profile.branding || null },
     });
@@ -60,7 +64,7 @@ const getProfile = async (req, res) => {
 /** GET / — reports, newest first. */
 const listReports = async (req, res) => {
     const reports = await SubjectReport.find({})
-        .select('-_id id title status error range_from range_to period_start period_end post_count created_at')
+        .select('-_id id title leader_key status error range_from range_to period_start period_end post_count created_at')
         .sort({ created_at: -1 }).limit(50).lean();
     res.json({ reports });
 };
@@ -74,33 +78,40 @@ const getReport = async (req, res) => {
 
 let generating = false;
 
-/** POST / {from?, to?} — build a report for a period, in the background. */
+/** POST / {from?, to?, leader?} — build a report for a period (one leader, or "all"), in the background. */
 const createReport = async (req, res) => {
     const from = parseDay(req.body?.from, false);
     const to = parseDay(req.body?.to, true);
     if (from === undefined || to === undefined) return res.status(400).json({ message: 'Invalid date' });
     if (from && to && from > to) return res.status(400).json({ message: '"From" must be before "To"' });
     if (generating) return res.status(409).json({ message: 'A report is already being generated' });
-    const { profile, leader } = await loadProfile();
+    const leaderKey = req.body?.leader && req.body.leader !== 'all' ? String(req.body.leader) : null;
+    if (leaderKey && !leaderByKey(leaderKey)) return res.status(400).json({ message: 'Unknown leader' });
+    const { profile } = await loadProfile();
+    const { scope, leader } = scopeOf(profile, leaderKey);
     const report = await SubjectReport.create({
-        title: profile.subject_name || leader?.name || 'Monitoring report',
+        title: scope === 'leader' ? leader.name : 'All leaders',
+        leader_key: leaderKey,
         status: 'generating', range_from: from, range_to: to, generated_by: userId(req),
     });
     generating = true;
-    completeReport(report.id, { profile, leader, from, to })
+    completeReport(report.id, { profile, leader, scope, from, to })
         .catch((err) => console.error('[subjectReports] report failed:', err.message))
         .finally(() => { generating = false; });
     res.status(202).json({ report: { id: report.id, status: report.status, range_from: from, range_to: to } });
 };
 
-/** GET /posts/export?from&to[&tone&skip&limit] — the period's relevant posts (Excel and the PDF appendix). */
+/**
+ * GET /posts/export?report=<id>[&tone&skip&limit] — a report's relevant posts (Excel and the
+ * PDF appendix), for its period and leader.
+ */
 const exportPosts = async (req, res) => {
-    const from = parseDay(req.query.from, false);
-    const to = parseDay(req.query.to, true);
-    if (from === undefined || to === undefined) return res.status(400).json({ message: 'Invalid date' });
     if (req.query.tone && !['positive', 'negative', 'neutral'].includes(req.query.tone)) return res.status(400).json({ message: 'Invalid tone' });
-    const { profile, leader } = await loadProfile();
-    let posts = (await loadPosts({ from, to }, subjectMatcher(profile, leader)))
+    const report = await SubjectReport.findOne({ id: String(req.query.report || '') }).select('id leader_key range_from range_to').lean();
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+    const { profile } = await loadProfile();
+    const { scope, leader } = scopeOf(profile, report.leader_key);
+    let posts = (await loadPosts({ from: report.range_from, to: report.range_to }, subjectFor(leader, scope)))
         .filter((p) => p.analysis.status === 'done' && p.analysis.is_relevant);
     if (req.query.tone) posts = posts.filter((p) => tone(p) === req.query.tone);
     posts.sort((a, b) => (new Date(b.published_at || 0) - new Date(a.published_at || 0)) || String(b._id).localeCompare(String(a._id)));
@@ -141,7 +152,7 @@ const exportPosts = async (req, res) => {
  */
 const startReportPdf = async (req, res) => {
     const report = await SubjectReport.findOne({ id: req.params.reportId })
-        .select('id title status range_from range_to period_start period_end').lean();
+        .select('id title leader_key status range_from range_to period_start period_end').lean();
     if (!report) return res.status(404).json({ message: 'Report not found' });
     if (report.status !== 'ready') return res.status(409).json({ message: 'The report is not ready yet' });
     // The page is opened at this fixed address (never one taken from the request), signed in with the caller's token.
@@ -151,13 +162,14 @@ const startReportPdf = async (req, res) => {
     const presentation = req.body?.format === 'presentation';
     const executive = req.body?.format === 'executive';
     const withPosts = Boolean(req.body?.posts) && !presentation;
-    const { profile, leader } = await loadProfile();
+    const { profile } = await loadProfile();
+    const { scope, leader } = scopeOf(profile, report.leader_key);
     const name = `${String(report.title || 'report').replace(/[^\w]+/g, '_').replace(/^_|_$/g, '')}`
         + `_${istDate(report.range_from || report.period_start) || 'start'}_to_${istDate(report.range_to || report.period_end) || 'latest'}`
         + `${executive ? '_executive' : ''}${presentation ? '_presentation' : ''}${withPosts ? '_with_posts' : ''}.pdf`;
     const job = startPdfJob({
         userId: userId(req), name,
-        baseUrl: baseUrl.replace(/\/+$/, ''), token, report, subject: subjectMatcher(profile, leader), withPosts, executive, presentation,
+        baseUrl: baseUrl.replace(/\/+$/, ''), token, report, subject: subjectFor(leader, scope), withPosts, executive, presentation,
     });
     res.status(202).json({ job: { id: job.id, status: job.status } });
 };

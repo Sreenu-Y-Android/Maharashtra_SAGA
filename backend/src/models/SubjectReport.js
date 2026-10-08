@@ -9,6 +9,8 @@ const { v4: uuidv4 } = require('uuid');
 const subjectReportSchema = new mongoose.Schema({
     id: { type: String, default: uuidv4, unique: true },
     title: { type: String, default: null },
+    // The roster leader the report is about; null for an all-leaders report (measured toward the profile's subject).
+    leader_key: { type: String, default: null },
     status: { type: String, enum: ['generating', 'ready', 'failed'], default: 'generating', index: true },
     error: { type: String, default: null },
     range_from: { type: Date, default: null },

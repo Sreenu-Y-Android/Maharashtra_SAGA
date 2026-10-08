@@ -20,7 +20,7 @@ export const PostsAppendix = ({ posts, slice = null }) => (
       <>
         <h2 className="mt-2 mb-1 pb-1 border-b-2 border-[#1e3a5f] text-[17px] font-bold text-[#1e3a5f]">Appendix — all posts in the period</h2>
         <p className="text-[11px] text-slate-600 mb-3">
-          {(slice ? slice.total : posts.length).toLocaleString('en-IN')} relevant posts, newest first within each tone. Tone is toward the subject and the government they serve in. Private individuals' posts are listed by link only; "Stance" is toward the subject.
+          {(slice ? slice.total : posts.length).toLocaleString('en-IN')} relevant posts, newest first within each tone. Tone is measured toward the report's subject, as defined in the report. Private individuals' posts are listed by link only; "Stance" is toward the subject.
         </p>
       </>
     )}
@@ -92,10 +92,7 @@ const PrintReport = () => {
       let posts = null;
       if (withPosts || slice) {
         const { data } = await api.get('/subject-reports/posts/export', {
-          params: {
-            from: istDay(report.range_from), to: istDay(report.range_to),
-            ...(slice ? { tone: slice.tone, skip: slice.skip, limit: slice.limit } : {}),
-          },
+          params: { report: report.id, ...(slice ? { tone: slice.tone, skip: slice.skip, limit: slice.limit } : {}) },
           timeout: 300000,
         });
         posts = data.posts;

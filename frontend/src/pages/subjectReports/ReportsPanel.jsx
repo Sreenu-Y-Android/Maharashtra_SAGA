@@ -23,8 +23,14 @@ const periodLabel = (r) => (r.range_from || r.range_to
   ? `${r.range_from ? fmtDay(r.range_from) : 'Start'} – ${r.range_to ? fmtDay(r.range_to) : 'latest'}`
   : `All time${r.period_start ? ` (${fmtDay(r.period_start)} – ${fmtDay(r.period_end)})` : ''}`);
 
-/** Reports on the whole monitored conversation for a period (no event): the Reports page's "Monitoring Reports" tab. */
-const ReportsPanel = ({ workspace }) => {
+const ALIGNMENT = { ally: 'ruling side', opposition: 'opposition', none: 'not aligned' };
+
+/**
+ * Reports for a period on one leader (only posts about them, measured toward them)
+ * or on all leaders (every monitored post): the Reports page's "Monitoring Reports" tab.
+ */
+const ReportsPanel = ({ workspace, leaders = [], defaultLeader, axisLabel = 'the state government' }) => {
+  const [leader, setLeader] = useState(defaultLeader || 'all');
   const [from, setFrom] = useState(istDaysAgo(6));
   const [to, setTo] = useState(istToday());
   const [reports, setReports] = useState([]);
@@ -73,7 +79,7 @@ const ReportsPanel = ({ workspace }) => {
   const generate = async () => {
     if (from && to && from > to) { toast.error('"From" must be on or before "To"'); return; }
     try {
-      await api.post('/subject-reports', { from, to });
+      await api.post('/subject-reports', { from, to, leader });
       toast.success('Generating report…');
       loadList();
     } catch (e) {
@@ -121,7 +127,7 @@ const ReportsPanel = ({ workspace }) => {
     try {
       const f = istDay(r.range_from);
       const t = istDay(r.range_to);
-      const { data } = await api.get('/subject-reports/posts/export', { params: { from: f || undefined, to: t || undefined }, timeout: 180000 });
+      const { data } = await api.get('/subject-reports/posts/export', { params: { report: r.id }, timeout: 180000 });
       exportPostsExcel(data.posts, { title: r.title || 'Monitoring report', from: f, to: t });
     } catch (e) {
       toast.error('Could not export posts');
@@ -135,6 +141,13 @@ const ReportsPanel = ({ workspace }) => {
       <div className="bg-white rounded-lg border p-4 print:hidden">
         <div className="font-semibold text-slate-900 mb-2">Generate a report</div>
         <div className="flex flex-wrap items-end gap-3">
+          <label className="text-sm">
+            <span className="block text-xs text-slate-500 mb-1">Leader</span>
+            <select className="border rounded-md px-2 py-1.5 text-sm bg-white max-w-[280px]" value={leader} onChange={(e) => setLeader(e.target.value)}>
+              <option value="all">All leaders (every monitored post)</option>
+              {leaders.map((l) => <option key={l.key} value={l.key}>{l.name} — {(l.role || '').split(';')[0]}</option>)}
+            </select>
+          </label>
           <label className="text-sm">
             <span className="block text-xs text-slate-500 mb-1">From</span>
             <input type="date" className="border rounded-md px-2 py-1.5 text-sm" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
@@ -156,6 +169,16 @@ const ReportsPanel = ({ workspace }) => {
             {pending ? 'Generating…' : 'Generate report'}
           </Button>
         </div>
+        <p className="text-xs text-slate-600 mt-2">
+          {(() => {
+            const l = leaders.find((x) => x.key === leader);
+            if (!l) return `All leaders: every monitored post in the period, measured toward ${leaders.find((x) => x.key === defaultLeader)?.name || 'the default subject'}.`;
+            const side = l.alignment === 'opposition'
+              ? `support for ${axisLabel} counts as negative for him or her, criticism of it as positive`
+              : l.alignment === 'ally' ? `support for ${axisLabel} counts as positive, criticism of it as negative` : `only direct stance toward ${l.name} counts`;
+            return `${l.name} (${ALIGNMENT[l.alignment] || 'not aligned'}): only posts that name or target ${l.name}, or come from their own account. Tone is measured toward ${l.name}; ${side}.`;
+          })()}
+        </p>
         <p className="text-xs text-slate-500 mt-2">Dates are Indian Standard Time. The report covers posts published in the period; positive, negative and neutral posts are broken down separately, and the Excel download has one sheet for each. Each report comes in two formats: the short “Executive PDF” and the full “Detailed PDF”; “Detailed + posts” adds every post in the period, grouped positive, negative and neutral, with post and footage links. Both download a ready PDF file.</p>
       </div>
 
@@ -163,12 +186,13 @@ const ReportsPanel = ({ workspace }) => {
         <div className="bg-white rounded-lg border print:hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs text-slate-500">
-              <tr><th className="p-2">Period</th><th className="p-2">Posts</th><th className="p-2">Created</th><th className="p-2">Status</th><th className="p-2 text-right">Download</th></tr>
+              <tr><th className="p-2">Leader</th><th className="p-2">Period</th><th className="p-2">Posts</th><th className="p-2">Created</th><th className="p-2">Status</th><th className="p-2 text-right">Download</th></tr>
             </thead>
             <tbody>
               {reports.map((r) => (
                 <tr key={r.id} className={`border-t ${open?.id === r.id ? 'bg-indigo-50' : ''}`}>
-                  <td className="p-2 font-medium">{periodLabel(r)}</td>
+                  <td className="p-2 font-medium">{r.title || 'All leaders'}</td>
+                  <td className="p-2">{periodLabel(r)}</td>
                   <td className="p-2">{r.status === 'ready' ? Number(r.post_count || 0).toLocaleString('en-IN') : '—'}</td>
                   <td className="p-2 text-slate-500">{fmtDateTime(r.created_at)}</td>
                   <td className="p-2">{r.status === 'generating' ? <span className="inline-flex items-center gap-1 text-amber-700"><Loader2 className="h-3 w-3 animate-spin" />generating</span> : r.status === 'failed' ? <span className="text-red-700">failed</span> : <span className="text-emerald-700">ready</span>}</td>

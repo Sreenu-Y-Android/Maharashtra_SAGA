@@ -76,14 +76,21 @@ const mapPost = (base, a, subject) => {
     const text = base.text || '';
     const mentioned = (a.mentioned_entities || []).some((e) => e && e.key === subject.key)
         || lt?.target_leader_key === subject.key
-        || subject.rx.test(text);
+        || subject.rx.test(text)
+        || Boolean(subject.handle && new RegExp(`@${subject.handle}\\b`, 'i').test(text));
+    // The leader's own posts: shown, but not counted as opinion about them.
+    const own = Boolean(subject.handle && String(base.author_handle || '').replace(/^@/, '').toLowerCase() === subject.handle.toLowerCase());
+    // In a single-leader report, only posts about the leader (or by them) are kept.
+    if (subject.scope === 'leader' && !mentioned && !own) return null;
 
+    // Which side the leader's camp is on decides whose sentiment stands in for them.
+    const ownSide = subject.alignment === 'opposition' ? (t) => t === 'opposition' : (t) => RULING_TARGETS.has(t);
     let stanceSubject = 'unclear';
-    if (mentioned) {
+    if (mentioned && !own) {
         if (lt?.target_leader_key === subject.key && lt.leader_sentiment) stanceSubject = SENTIMENT_TO_STANCE[lt.leader_sentiment] || 'unclear';
-        else if (RULING_TARGETS.has(a.target) && a.target_sentiment) stanceSubject = SENTIMENT_TO_STANCE[a.target_sentiment] || 'unclear';
+        else if (subject.alignment && subject.alignment !== 'none' && ownSide(a.target) && a.target_sentiment) stanceSubject = SENTIMENT_TO_STANCE[a.target_sentiment] || 'unclear';
     }
-    const stanceAxis = governmentStance(a, lt);
+    const stanceAxis = own ? 'unclear' : governmentStance(a, lt);
     const intent = a.intent || a.category || 'Normal';
     let band = 'low';
     let unconfirmed = false;
@@ -111,9 +118,13 @@ const mapPost = (base, a, subject) => {
         hashtags: extractHashtags(text),
         language: scriptLanguage(a.language_detected),
         analysis: {
+            own_post: own,
+            // +1: support for the state government helps the subject (an ally); -1: it hurts them
+            // (opposition); 0: the government axis does not bear on them.
+            axis_sign: subject.alignment === 'opposition' ? -1 : subject.alignment === 'ally' ? 1 : 0,
             status: done ? 'done' : 'pending',
             is_relevant: done ? (a.client_relevance || a.llm_analysis?.client_relevance) === 'relevant' : null,
-            category: stanceAxis === 'critical' || stanceSubject === 'critical' ? 'criticism'
+            category: own ? 'own_post' : stanceAxis === 'critical' || stanceSubject === 'critical' ? 'criticism'
                 : (stanceAxis === 'supportive' || stanceSubject === 'supportive' ? 'reaction_support' : 'neutral_reporting'),
             target: a.target_entity_canonical || a.target_entity || a.llm_analysis?.target_entity || null,
             target_type: targetType,
@@ -152,6 +163,7 @@ const mediaOf = (items = []) => items.map((x) => ({
  * and de-duplicated across mentions and monitored sources.
  */
 const loadPosts = async ({ from = null, to = null }, subject) => {
+    // subject: { key, rx, handle, alignment, scope: 'leader' | 'all' }
     const range = (field) => {
         const q = {};
         if (from || to) {
@@ -185,7 +197,8 @@ const loadPosts = async ({ from = null, to = null }, subject) => {
             metrics,
             engagement_total: total(metrics),
         };
-        posts.set(`${base.platform}:${base.platform_post_id}`, mapPost(base, g.analysis || {}, subject));
+        const mapped = mapPost(base, g.analysis || {}, subject);
+        if (mapped) posts.set(`${base.platform}:${base.platform_post_id}`, mapped);
     });
 
     const contents = await Content.find({ ...range('published_at') })
@@ -217,7 +230,8 @@ const loadPosts = async ({ from = null, to = null }, subject) => {
             metrics: c.is_repost ? { likes: null, comments: null, shares: null, views: null } : metrics,
             engagement_total: c.is_repost ? 0 : total(metrics),
         };
-        posts.set(key, mapPost(base, a, subject));
+        const mapped = mapPost(base, a, subject);
+        if (mapped) posts.set(key, mapped);
     });
     return [...posts.values()];
 };

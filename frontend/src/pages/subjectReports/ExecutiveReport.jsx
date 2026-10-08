@@ -161,7 +161,8 @@ const ExecutiveReport = ({ report }) => {
       <H2 n={1}>Executive summary</H2>
       <H3>Overall conversation</H3>
       <P>
-        Toward {name}, the monitored conversation is {lcFirst(toneWord)}: {pctTxt(neg)} of relevant posts are negative (they criticise {name} or {axis}), and {pctTxt(pos)} are positive. Discussion is largely centred on{' '}
+        Toward {name}, the monitored conversation is {lcFirst(toneWord)}: {pctTxt(neg)} of relevant posts are negative and {pctTxt(pos)} positive
+        (a negative post {ev.tone?.negative || `criticises ${name}`}; a positive one {ev.tone?.positive || `supports ${name}`}). Discussion is largely centred on{' '}
         {listJoin(narratives.slice(0, 4).map((n) => lcFirst(n.label)))}.
       </P>
       <P>
