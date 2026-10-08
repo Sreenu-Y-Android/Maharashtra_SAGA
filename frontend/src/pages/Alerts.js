@@ -22,6 +22,7 @@ import AddSourceModal from '../components/AddSourceModal';
 import { useRbac } from '../contexts/RbacContext';
 import { useAuth } from '../contexts/AuthContext';
 import { canManageRestrictedGrievanceUi } from '../lib/grievanceUiPermissions';
+import { DEFAULT_MH_LEADER } from '../config/partyMedia';
 // Same resolver the cards use, so the client-side filter and the rendered badge
 // can never disagree about a record.
 import { getAlertSentiment } from '../lib/sentiment';
@@ -182,7 +183,8 @@ const Alerts = () => {
   const [leaderSeat, setLeaderSeat] = useState(() => new URLSearchParams(window.location.search).get('leader') || '');
   // ?mh_leader=<key>: alerts on posts naming, or posted by, one of the
   // monitored Maharashtra leaders (same matching as the leader reports).
-  const [mhLeader, setMhLeader] = useState(() => new URLSearchParams(window.location.search).get('mh_leader') || 'all');
+  // Starts on the default leader; ?mh_leader=all (or picking All Leaders) shows every leader.
+  const [mhLeader, setMhLeader] = useState(() => new URLSearchParams(window.location.search).get('mh_leader') || DEFAULT_MH_LEADER.key);
   const [mhLeaders, setMhLeaders] = useState([]);
   useEffect(() => {
     api.get('/alerts/mh-leaders')

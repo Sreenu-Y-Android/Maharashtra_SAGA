@@ -51,6 +51,10 @@ import { RssNewsCard } from '../components/grievances/RssNewsCard';
 import { YouTubeLiveTab } from '../components/grievances/YouTubeLiveTab';
 import { useRbac } from '../contexts/RbacContext';
 import { canManageRestrictedGrievanceUi } from '../lib/grievanceUiPermissions';
+import { DEFAULT_MH_LEADER } from '../config/partyMedia';
+
+/** ?mh_leader: absent ⇒ the default leader; 'all' ⇒ every leader; else that key. */
+const mhLeaderFromUrl = (v) => (v === 'all' ? null : (v || DEFAULT_MH_LEADER.key));
 //added
 
 const EMPTY_SENTIMENT_LEADERS = {
@@ -879,7 +883,7 @@ const Grievances = () => {
     const [leaderFilter, setLeaderFilter] = useState(() => searchParams.get('leader') || null);
     // ?mh_leader=<key>: posts naming, or posted by, one of the monitored
     // Maharashtra leaders (same matching as the leader reports).
-    const [mhLeaderFilter, setMhLeaderFilter] = useState(() => searchParams.get('mh_leader') || null);
+    const [mhLeaderFilter, setMhLeaderFilter] = useState(() => mhLeaderFromUrl(searchParams.get('mh_leader')));
     const [mhLeaders, setMhLeaders] = useState([]);
     // Was a hardcoded list mixing real AI-classified categories (e.g. "Public
     // Complaint", "Political Criticism") with values that never actually
@@ -1017,7 +1021,7 @@ const Grievances = () => {
         const urlAnalysisCategory = searchParams.get('analysis_category') || null;
         const urlTargetEntity = searchParams.get('target_entity') || null;
         const urlLeader = searchParams.get('leader') || null;
-        const urlMhLeader = searchParams.get('mh_leader') || null;
+        const urlMhLeader = mhLeaderFromUrl(searchParams.get('mh_leader'));
         const urlPlatform = platformFromUrl(searchParams.get('platform'));
         const urlFrom = searchParams.get('from');
         const urlTo = searchParams.get('to');
@@ -2130,7 +2134,7 @@ const Grievances = () => {
     // feed narrowed by any of them looked unfiltered.
     const hasActiveFilters = navbarPlatform !== 'all' || dateRange.from || dateRange.to
         || debouncedSearch || navbarStatus !== 'total' || selectedHandle || locationFilter
-        || sentimentFilter || stanceFilter || topicFilter || analysisCategoryFilter || targetEntityFilter || leaderFilter || mhLeaderFilter;
+        || sentimentFilter || stanceFilter || topicFilter || analysisCategoryFilter || targetEntityFilter || leaderFilter || (mhLeaderFilter && mhLeaderFilter !== DEFAULT_MH_LEADER.key);
     const isReportsTab = navbarStatus === 'reports';
 
     // No more client-side location filtering — backend handles it via location_city param
@@ -2569,7 +2573,7 @@ const Grievances = () => {
                 onStanceChange={(value) => updateURLParams({ stance: value || null })}
                 mhLeaders={mhLeaders}
                 mhLeaderFilter={mhLeaderFilter}
-                onMhLeaderChange={(value) => updateURLParams({ mh_leader: value || null })}
+                onMhLeaderChange={(value) => updateURLParams({ mh_leader: value || 'all' })}
             />
 
             {/* Dashboard Filter Banner */}
@@ -2579,7 +2583,7 @@ const Grievances = () => {
                     {mhLeaderFilter && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-semibold text-[11px]">
                             Leader: {mhLeaders.find((l) => l.key === mhLeaderFilter)?.name || mhLeaderFilter}
-                            <button type="button" onClick={() => updateURLParams({ mh_leader: null })} className="ml-0.5 hover:opacity-70">&times;</button>
+                            <button type="button" onClick={() => updateURLParams({ mh_leader: 'all' })} className="ml-0.5 hover:opacity-70">&times;</button>
                         </span>
                     )}
                     {leaderFilter && (

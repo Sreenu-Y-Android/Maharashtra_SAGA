@@ -58,6 +58,7 @@ import {
   YAxis
 } from 'recharts';
 import api from '../lib/api';
+import { DEFAULT_MH_LEADER } from '../config/partyMedia';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { exportAsPNG } from '../lib/chartExportUtils';
@@ -400,7 +401,7 @@ const AlertsIntelligence = ({ data, dateFrom, dateTo }) => {
   const [reportRiskFilter, setReportRiskFilter] = useState('all');
   const [reportTopicFilter, setReportTopicFilter] = useState('all');
   // One monitored leader: alerts on posts naming, or posted by, them.
-  const [reportLeaderFilter, setReportLeaderFilter] = useState('all');
+  const [reportLeaderFilter, setReportLeaderFilter] = useState(DEFAULT_MH_LEADER.key);
   const mhLeaders = useMhLeaders('/alerts/mh-leaders');
   const [topicCounts, setTopicCounts] = useState([]);
   const [alertsPage, setAlertsPage] = useState(1);
@@ -1753,7 +1754,7 @@ const GrievancesIntelligence = ({ data, dateFrom, dateTo }) => {
   const [reportCategoryFilter, setReportCategoryFilter] = useState('all');
   const [reportTopicFilter, setReportTopicFilter] = useState('all');
   // One monitored leader: posts naming, or posted by, them.
-  const [reportLeaderFilter, setReportLeaderFilter] = useState('all');
+  const [reportLeaderFilter, setReportLeaderFilter] = useState(DEFAULT_MH_LEADER.key);
   const mhLeaders = useMhLeaders('/grievances/mh-leaders');
   const [availableTopics, setAvailableTopics] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]);

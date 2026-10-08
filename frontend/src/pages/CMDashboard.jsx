@@ -54,7 +54,7 @@ import api from '../lib/api';
 import { APP_NAVIGATION } from '../config/navigation';
 import { useRbac } from '../contexts/RbacContext';
 import BriefExportDialog from '../components/cmBrief/BriefExportDialog';
-import { BRAND } from '../config/partyMedia';
+import { BRAND, DEFAULT_MH_LEADER } from '../config/partyMedia';
 
 // The "Your Party" spotlight (a single party's mention count and stance) is
 // hidden on this site, which carries no party branding. The leader-alignment
@@ -139,13 +139,16 @@ const recLink = (link, links) => {
   return links.mentions(extra);
 };
 
-const makeLinks = (win) => {
+// `mhLeader` carries the brief's leader focus into Mentions / Alerts (a key,
+// or 'all'), so the page opened shows the same posts the figure counted.
+const makeLinks = (win, mhLeader) => {
   const from = ymd(win?.from);
   const to = ymd(win?.to);
+  const lead = mhLeader ? { mh_leader: mhLeader } : {};
   return {
-    mentions: (extra = {}) => `/grievances${qs({ from, to, ...extra })}`,
+    mentions: (extra = {}) => `/grievances${qs({ from, to, ...lead, ...extra })}`,
     articles: (extra = {}) => `/public-web-articles${qs({ from, to, ...extra })}`,
-    alerts: (extra = {}) => `/alerts${qs({ from, to, ...extra })}`,
+    alerts: (extra = {}) => `/alerts${qs({ from, to, ...lead, ...extra })}`,
     // A district figure combines news and social; only Geo Intel shows both.
     district: (name) => `/geographic-intelligence/${encodeURIComponent(name)}`,
   };
@@ -629,7 +632,8 @@ export default function CMDashboard() {
    * districts, handles, alerts, sentiment — is already scoped by the
    * same filter server-side, so this is the whole change.
    */
-  const [leader, setLeader] = useState('');
+  // Starts on the default leader (the client's main agenda); '' = all leaders.
+  const [leader, setLeader] = useState(DEFAULT_MH_LEADER.name);
   /**
    * The dropdown's own list, kept from the UNFILTERED response.
    *
@@ -639,6 +643,15 @@ export default function CMDashboard() {
    * option reachable while a filter is active.
    */
   const [leaderOptions, setLeaderOptions] = useState([]);
+  // The monitored leaders with their keys: the dropdown's list until an
+  // unfiltered load supplies counts (the brief now opens filtered), and the
+  // name → key map the Mentions / Alerts links need.
+  const [mhRoster, setMhRoster] = useState([]);
+  useEffect(() => {
+    api.get('/grievances/mh-leaders')
+      .then((r) => setMhRoster(Array.isArray(r.data?.leaders) ? r.data.leaders : []))
+      .catch(() => setMhRoster([]));
+  }, []);
   // Same gate the sidebar uses, so a pill never offers a page the user
   // cannot open.
   const { hasAccess } = useRbac();
@@ -677,7 +690,8 @@ export default function CMDashboard() {
     + (data?.by_source?.alerts?.total || 0);
   // Built from the window the API reported, so a drill-down always lands on
   // exactly the period this page measured.
-  const links = useMemo(() => makeLinks(data?.window), [data]);
+  const leaderKey = leader ? (mhRoster.find((l) => l.name === leader)?.key || leader) : 'all';
+  const links = useMemo(() => makeLinks(data?.window, leaderKey), [data, leaderKey]);
 
   // The donut stays on social mentions only: an article's tone and a public
   // post's stance are different measurements, and the issue tracker below is
@@ -787,13 +801,13 @@ export default function CMDashboard() {
                 any with no mentions this window — a quiet leader is exactly
                 the one someone wants to check, and the brief reports the
                 nil return rather than showing an empty page. */}
-            {(leaderOptions || []).length > 0 && (
+            {(leaderOptions.length ? leaderOptions : mhRoster).length > 0 && (
               <select value={leader} onChange={(e) => setLeader(e.target.value)}
                 className="px-3 py-2 bg-white rounded-lg border border-slate-200 text-[12.5px] font-medium text-slate-700 max-w-[220px]">
                 <option value="">All leaders</option>
-                {leaderOptions.map((l) => (
+                {(leaderOptions.length ? leaderOptions : mhRoster).map((l) => (
                   <option key={l.name} value={l.name}>
-                    {l.name}{l.mentions ? ` · ${l.mentions}` : ' · 0'}
+                    {l.name}{l.mentions == null ? '' : ` · ${l.mentions || 0}`}
                   </option>
                 ))}
               </select>

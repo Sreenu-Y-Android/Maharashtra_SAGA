@@ -32,6 +32,12 @@ export const BRAND = {
   lokSabhaCount: 48,
 };
 
+/* ─── Default leader focus ─────────────────────────────────────────── */
+// The client's main agenda: the Leader filter on the Intelligence Brief,
+// Mentions, Alerts and Reports starts on this leader. "All leaders" stays
+// one click away. `key` matches backend data/mh_leaders.json.
+export const DEFAULT_MH_LEADER = { key: 'mh-eknath-shinde', name: 'Eknath Shinde' };
+
 /* ─── Portraits of the client leadership ─────────────────────────── */
 // Eknath Shinde: CC BY-SA 4.0 (Wikimedia Commons).
 export const PARTY_PORTRAITS = [
