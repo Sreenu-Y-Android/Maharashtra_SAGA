@@ -119,3 +119,8 @@ KKSAGA_MIGRATION.pdf
 KKSAGA_MIGRATION.docx
 PIPELINE_FORENSIC_ANALYSIS.md
 frontend/vercel.json
+
+# macOS copy artefacts and scratch files
+._*
+.DS_Store
+*.tmp.js
