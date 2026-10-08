@@ -162,7 +162,7 @@ const mediaOf = (items = []) => items.map((x) => ({
  * All monitored posts published in [from, to] (either bound optional), mapped
  * and de-duplicated across mentions and monitored sources.
  */
-const loadPosts = async ({ from = null, to = null }, subject) => {
+const loadPosts = async ({ from = null, to = null, platforms = [] }, subject) => {
     // subject: { key, rx, handle, alignment, scope: 'leader' | 'all' }
     const range = (field) => {
         const q = {};
@@ -174,8 +174,13 @@ const loadPosts = async ({ from = null, to = null }, subject) => {
         return q;
     };
 
+    // Only the analysis fields the report reads (the full analysis carries large forensic records).
+    const ANALYSIS_FIELDS = ['sentiment', 'client_relevance', 'leader_target', 'mentioned_entities', 'target', 'target_sentiment',
+        'political_stance', 'stance', 'intent', 'category', 'risk_level', 'topic', 'explanation', 'language_detected',
+        'target_entity_canonical', 'target_entity', 'llm_analysis.leader_target', 'llm_analysis.sentiment',
+        'llm_analysis.client_relevance', 'llm_analysis.reasoning', 'llm_analysis.target_entity'].map((f) => `analysis.${f}`).join(' ');
     const grievances = await Grievance.find({ ...range('post_date'), is_active: { $ne: false } })
-        .select('id tweet_id platform posted_by content tweet_url engagement post_date analysis')
+        .select(`id tweet_id platform posted_by content.text content.full_text content.media tweet_url engagement post_date ${ANALYSIS_FIELDS}`)
         .lean();
     const posts = new Map();
     grievances.forEach((g) => {
@@ -205,7 +210,9 @@ const loadPosts = async ({ from = null, to = null }, subject) => {
         .select('id platform content_id content_url text author author_handle published_at media engagement is_repost risk_level sentiment')
         .lean();
     const analyses = await Analysis.find({ content_id: { $in: contents.map((c) => c.id) } })
-        .select('content_id sentiment risk_level language llm_analysis explanation')
+        .select(`content_id sentiment risk_level language explanation ${['sentiment', 'client_relevance', 'leader_target', 'mentioned_entities', 'target',
+            'target_sentiment', 'political_stance', 'stance', 'intent', 'category', 'topic', 'language_detected', 'target_entity', 'reasoning']
+            .map((f) => `llm_analysis.${f}`).join(' ')}`)
         .lean();
     const byContent = new Map(analyses.map((x) => [x.content_id, x]));
     contents.forEach((c) => {
@@ -233,7 +240,8 @@ const loadPosts = async ({ from = null, to = null }, subject) => {
         const mapped = mapPost(base, a, subject);
         if (mapped) posts.set(key, mapped);
     });
-    return [...posts.values()];
+    const only = new Set((platforms || []).filter(Boolean));
+    return [...posts.values()].filter((p) => !only.size || only.has(p.platform));
 };
 
 module.exports = { loadPosts, mapPost, slug };

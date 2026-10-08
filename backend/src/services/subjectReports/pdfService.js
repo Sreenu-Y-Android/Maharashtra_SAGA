@@ -125,7 +125,7 @@ const joinAndNumber = async (buffers, { number = true } = {}) => {
 
 /** Relevant posts per tone in the report's period, for slicing the appendix. */
 const toneCounts = async (report, subject) => {
-    const posts = await loadPosts({ from: report.range_from, to: report.range_to }, subject);
+    const posts = await loadPosts({ from: report.range_from, to: report.range_to, platforms: report.platforms || [] }, subject);
     const counts = { positive: 0, negative: 0, neutral: 0 };
     posts.forEach((p) => { if (p.analysis.status === 'done' && p.analysis.is_relevant) counts[tone(p)] += 1; });
     return counts;

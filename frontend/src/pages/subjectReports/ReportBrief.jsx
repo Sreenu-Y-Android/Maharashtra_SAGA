@@ -124,8 +124,11 @@ const ToneBar = ({ tone }) => {
  * Daily stacked tone bars (SVG, print-safe) with each day's negativity % above
  * the bar and a red dot under days that carry high/critical-risk posts.
  */
-export const DailyToneChart = ({ rows: chronological }) => {
-  if (!chronological.length) return null;
+// Long periods (e.g. "All time") are charted for their most recent days only.
+const CHART_MAX_DAYS = 60;
+export const DailyToneChart = ({ rows: allRows }) => {
+  if (!allRows.length) return null;
+  const chronological = allRows.slice(-CHART_MAX_DAYS);
   const rows = [...chronological].reverse(); // newest date first
   const W = 860; const H = 240; const padL = 36; const padB = 40; const padT = 26;
   const max = Math.max(1, ...rows.map((r) => r.total));
@@ -172,7 +175,8 @@ export const DailyToneChart = ({ rows: chronological }) => {
 const LocationHeat = ({ trends }) => {
   if (!trends?.places?.length) return null;
   const max = Math.max(1, ...trends.places.flatMap((p) => p.by_day));
-  const order = trends.days.map((_, i) => i).reverse(); // newest date first
+  // Newest date first; long periods show their most recent 30 days.
+  const order = trends.days.map((_, i) => i).reverse().slice(0, 30);
   const days = order.map((i) => trends.days[i]);
   return (
     <div className="overflow-x-auto">
@@ -376,9 +380,12 @@ const ReportBrief = ({ report, workspace, onDownloadPdf }) => {
         a red dot marks days with critical or high-risk posts. Peak: {fmt(s.volume_change.peak_posts)} posts on {s.volume_change.peak_day ? fmtDay(s.volume_change.peak_day) : '—'}.
       </p>
       <DailyToneChart rows={s.timeline} />
+      {s.timeline.length > CHART_MAX_DAYS && (
+        <p className="text-[11px] italic text-slate-500 mt-1">The chart and table show the most recent {CHART_MAX_DAYS} of the {fmt(s.timeline.length)} days with posts; all other figures cover the whole period.</p>
+      )}
       <div className="mt-3"><Table
         head={['Day', 'Posts', '% negative', `Critical of ${ev.subject?.name || 'subject'}`, 'High-risk', 'Leading narrative', 'Most-named place']}
-        rows={[...s.timeline].reverse().map((d) => [
+        rows={[...s.timeline].slice(-CHART_MAX_DAYS).reverse().map((d) => [
           <b>{fmtDay(d.day)}</b>, fmt(d.total),
           <span style={{ color: d.negative_pct >= 50 ? '#b91c1c' : undefined, fontWeight: d.negative_pct >= 50 ? 600 : 400 }}>{d.negative_pct ?? '—'}%</span>,
           fmt(d.critical_of_subject), d.high_risk ? <span className="text-red-700 font-semibold">{fmt(d.high_risk)}</span> : '0',

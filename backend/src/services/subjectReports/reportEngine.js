@@ -196,9 +196,13 @@ const computeStats = (event, all) => {
     }).filter((k) => k.count > 0).sort((a, b) => b.count - a.count);
 
     // Timeline (IST days).
-    const days = [...new Set(dated.map((p) => istDay(p.published_at)))].sort();
+    // Each post's IST day, computed once; posts grouped by day (long periods have 1,000+ days).
+    const dayOfPost = new Map(dated.map((p) => [p, istDay(p.published_at)]));
+    const postsByDay = new Map();
+    dated.forEach((p) => { const d = dayOfPost.get(p); if (!postsByDay.has(d)) postsByDay.set(d, []); postsByDay.get(d).push(p); });
+    const days = [...postsByDay.keys()].sort();
     const timeline = days.map((day) => {
-        const rows = dated.filter((p) => istDay(p.published_at) === day);
+        const rows = postsByDay.get(day) || [];
         const row = { day, total: rows.length, engagement: rows.reduce((a, p) => a + (p.engagement_total || 0), 0) };
         PLATFORMS.forEach((pl) => { row[pl] = rows.filter((p) => p.platform === pl).length; });
         row.negative = rows.filter((p) => tone(p) === 'negative').length;
@@ -280,7 +284,9 @@ const computeStats = (event, all) => {
         days,
         places: trendPlaces.map((place) => {
             const rows = dated.filter((p) => (p.analysis.places || []).some((x) => titleCase(x) === place));
-            const byDay = days.map((day) => rows.filter((p) => istDay(p.published_at) === day).length);
+            const counts = new Map();
+            rows.forEach((p) => { const d = dayOfPost.get(p); counts.set(d, (counts.get(d) || 0) + 1); });
+            const byDay = days.map((day) => counts.get(day) || 0);
             const peakIdx = byDay.indexOf(Math.max(...byDay));
             return {
                 place,
@@ -693,13 +699,13 @@ const reportContext = (profile, leader, narratives, scope) => ({
 });
 
 /** Build the report document for posts published in [from, to]. */
-const buildReportData = async ({ profile, leader, scope = 'leader', from = null, to = null }) => {
-    const posts = await loadPosts({ from, to }, subjectFor(leader, scope));
+const buildReportData = async ({ profile, leader, scope = 'leader', from = null, to = null, platforms = [] }) => {
+    const posts = await loadPosts({ from, to, platforms }, subjectFor(leader, scope));
     // Narratives are the issue topics present in the period.
     const topics = new Map();
     posts.forEach((p) => { if (p.analysis.topic) topics.set(p.analysis.narratives[0], p.analysis.topic); });
     const narratives = [...topics.entries()].map(([key, label]) => ({ key, label, description: '' }));
-    const event = reportContext(profile, leader, narratives, scope);
+    const event = { ...reportContext(profile, leader, narratives, scope), platforms_filter: platforms || [] };
     const stats = computeStats(event, posts);
     const prose = templateProse(event, stats);
 
@@ -740,9 +746,9 @@ const reportFields = (event, stats, data, range) => ({
 });
 
 /** Fill in a report row created earlier with status 'generating'. */
-const completeReport = async (reportId, { profile, leader, scope = 'leader', from = null, to = null }) => {
+const completeReport = async (reportId, { profile, leader, scope = 'leader', from = null, to = null, platforms = [] }) => {
     try {
-        const { stats, data } = await buildReportData({ profile, leader, scope, from, to });
+        const { stats, data } = await buildReportData({ profile, leader, scope, from, to, platforms });
         await SubjectReport.updateOne({ id: reportId }, { $set: { status: 'ready', error: null, ...reportFields(data.event, stats, data, { from, to }) } });
     } catch (err) {
         await SubjectReport.updateOne({ id: reportId }, { $set: { status: 'failed', error: err.message } });

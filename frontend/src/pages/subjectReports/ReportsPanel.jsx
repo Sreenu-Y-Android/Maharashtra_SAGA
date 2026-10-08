@@ -15,6 +15,24 @@ import { exportPostsExcel } from './exportPostsExcel';
 
 const istToday = () => new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);
 const istDaysAgo = (n) => new Date(Date.now() + 5.5 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+/** First and last day (YYYY-MM-DD) of the month `back` months before the current IST month. */
+const istMonth = (back) => {
+  const [y, m] = istToday().split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 - back, 1));
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
+  return [d.toISOString().slice(0, 10), last.toISOString().slice(0, 10)];
+};
+// Quick ranges; ['', ''] is all time (no date limit).
+const PRESETS = [
+  ['Today', () => [istToday(), istToday()]],
+  ['Yesterday', () => [istDaysAgo(1), istDaysAgo(1)]],
+  ['Last 7 days', () => [istDaysAgo(6), istToday()]],
+  ['Last 30 days', () => [istDaysAgo(29), istToday()]],
+  ['This month', () => [istMonth(0)[0], istToday()]],
+  ['Last month', () => istMonth(1)],
+  ['All time', () => ['', '']],
+];
+const PLATFORMS = [['x', 'X'], ['facebook', 'Facebook'], ['instagram', 'Instagram'], ['youtube', 'YouTube']];
 const istDay = (d) => (d ? new Date(new Date(d).getTime() + 5.5 * 3600000).toISOString().slice(0, 10) : null);
 const fmtDay = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const fmtDateTime = (d) => (d ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
@@ -33,6 +51,8 @@ const ReportsPanel = ({ workspace, leaders = [], defaultLeader, axisLabel = 'the
   const [leader, setLeader] = useState(defaultLeader || 'all');
   const [from, setFrom] = useState(istDaysAgo(6));
   const [to, setTo] = useState(istToday());
+  const [platforms, setPlatforms] = useState(PLATFORMS.map(([k]) => k));
+  const togglePlatform = (k) => setPlatforms((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
   const [reports, setReports] = useState([]);
   const [open, setOpen] = useState(null);
   const [busy, setBusy] = useState({});
@@ -72,14 +92,13 @@ const ReportsPanel = ({ workspace, leaders = [], defaultLeader, axisLabel = 'the
     return () => clearInterval(t);
   }, [pending, reports, loadList, openReport]);
 
-  const preset = (days) => {
-    setFrom(istDaysAgo(days - 1)); setTo(istToday());
-  };
+  const preset = (range) => { const [f, t] = range(); setFrom(f); setTo(t); };
 
   const generate = async () => {
     if (from && to && from > to) { toast.error('"From" must be on or before "To"'); return; }
     try {
-      await api.post('/subject-reports', { from, to, leader });
+      if (!platforms.length) { toast.error('Choose at least one platform'); return; }
+      await api.post('/subject-reports', { from: from || null, to: to || null, leader, platforms });
       toast.success('Generating report…');
       loadList();
     } catch (e) {
@@ -150,19 +169,30 @@ const ReportsPanel = ({ workspace, leaders = [], defaultLeader, axisLabel = 'the
           </label>
           <label className="text-sm">
             <span className="block text-xs text-slate-500 mb-1">From</span>
-            <input type="date" className="border rounded-md px-2 py-1.5 text-sm" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date" className="border rounded-md px-2 py-1.5 text-sm" value={from} max={to || istToday()} onChange={(e) => setFrom(e.target.value)} />
           </label>
           <label className="text-sm">
             <span className="block text-xs text-slate-500 mb-1">To</span>
             <input type="date" className="border rounded-md px-2 py-1.5 text-sm" value={to} min={from || undefined} max={istToday()} onChange={(e) => setTo(e.target.value)} />
           </label>
           <div className="flex flex-wrap gap-1">
-            {[['Today', 1], ['Last 3 days', 3], ['Last 7 days', 7], ['Last 30 days', 30]].map(([label, d]) => {
-              const active = to === istToday() && from === istDaysAgo(d - 1);
+            {PRESETS.map(([label, range]) => {
+              const [f, t] = range();
+              const active = from === f && to === t;
               return (
-                <Button key={label} type="button" variant={active ? 'default' : 'outline'} size="sm" onClick={() => preset(d)} aria-pressed={active}>{label}</Button>
+                <Button key={label} type="button" variant={active ? 'default' : 'outline'} size="sm" onClick={() => preset(range)} aria-pressed={active}>{label}</Button>
               );
             })}
+          </div>
+          <div className="text-sm">
+            <span className="block text-xs text-slate-500 mb-1">Platforms</span>
+            <div className="flex flex-wrap gap-3 py-1.5">
+              {PLATFORMS.map(([k, label]) => (
+                <label key={k} className="inline-flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={platforms.includes(k)} onChange={() => togglePlatform(k)} />{label}
+                </label>
+              ))}
+            </div>
           </div>
           <Button onClick={generate} disabled={pending} className="ml-auto">
             {pending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
@@ -186,13 +216,14 @@ const ReportsPanel = ({ workspace, leaders = [], defaultLeader, axisLabel = 'the
         <div className="bg-white rounded-lg border print:hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs text-slate-500">
-              <tr><th className="p-2">Leader</th><th className="p-2">Period</th><th className="p-2">Posts</th><th className="p-2">Created</th><th className="p-2">Status</th><th className="p-2 text-right">Download</th></tr>
+              <tr><th className="p-2">Report</th><th className="p-2">Period</th><th className="p-2">Platforms</th><th className="p-2">Posts</th><th className="p-2">Created</th><th className="p-2">Status</th><th className="p-2 text-right">Download</th></tr>
             </thead>
             <tbody>
               {reports.map((r) => (
                 <tr key={r.id} className={`border-t ${open?.id === r.id ? 'bg-indigo-50' : ''}`}>
                   <td className="p-2 font-medium">{r.title || 'All leaders'}</td>
                   <td className="p-2">{periodLabel(r)}</td>
+                  <td className="p-2 text-slate-600">{(r.platforms || []).length ? r.platforms.map((k) => (PLATFORMS.find(([x]) => x === k) || [k, k])[1]).join(', ') : 'All'}</td>
                   <td className="p-2">{r.status === 'ready' ? Number(r.post_count || 0).toLocaleString('en-IN') : '—'}</td>
                   <td className="p-2 text-slate-500">{fmtDateTime(r.created_at)}</td>
                   <td className="p-2">{r.status === 'generating' ? <span className="inline-flex items-center gap-1 text-amber-700"><Loader2 className="h-3 w-3 animate-spin" />generating</span> : r.status === 'failed' ? <span className="text-red-700">failed</span> : <span className="text-emerald-700">ready</span>}</td>

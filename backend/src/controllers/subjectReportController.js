@@ -7,10 +7,29 @@
 const SubjectReport = require('../models/SubjectReport');
 const ReportProfile = require('../models/ReportProfile');
 const MH = require('../data/mh_leaders.json');
-const { completeReport, tone, subjectFor, footageOf, isPublicAccount } = require('../services/subjectReports/reportEngine');
+const { tone, subjectFor, footageOf, isPublicAccount } = require('../services/subjectReports/reportEngine');
 const { loadPosts } = require('../services/subjectReports/postAdapter');
 const { startPdfJob, getJob } = require('../services/subjectReports/pdfService');
 const { expand } = require('../services/subjectReports/textClean');
+const path = require('path');
+const { fork } = require('child_process');
+
+const WORKER = path.join(__dirname, '../services/subjectReports/reportWorker.js');
+const WORKER_TIMEOUT_MS = 15 * 60000;
+
+/** Run a report build in a child process (its own memory cap; the API process stays responsive). */
+const runInWorker = (reportId, options) => new Promise((resolve) => {
+    const child = fork(WORKER, [], { execArgv: ['--max-old-space-size=900'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'] });
+    const timer = setTimeout(() => child.kill('SIGKILL'), WORKER_TIMEOUT_MS);
+    child.on('exit', async (code) => {
+        clearTimeout(timer);
+        if (code !== 0) {
+            await SubjectReport.updateOne({ id: reportId, status: 'generating' }, { $set: { status: 'failed', error: code === null ? 'Timed out' : 'Report generation failed' } }).catch(() => {});
+        }
+        resolve();
+    });
+    child.send({ reportId, options });
+});
 
 const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
     console.error('[subjectReports]', err);
@@ -64,7 +83,7 @@ const getProfile = async (req, res) => {
 /** GET / — reports, newest first. */
 const listReports = async (req, res) => {
     const reports = await SubjectReport.find({})
-        .select('-_id id title leader_key status error range_from range_to period_start period_end post_count created_at')
+        .select('-_id id title leader_key platforms status error range_from range_to period_start period_end post_count created_at')
         .sort({ created_at: -1 }).limit(50).lean();
     res.json({ reports });
 };
@@ -78,7 +97,7 @@ const getReport = async (req, res) => {
 
 let generating = false;
 
-/** POST / {from?, to?, leader?} — build a report for a period (one leader, or "all"), in the background. */
+/** POST / {from?, to?, leader?, platforms?} — build a report for a period (one leader, or "all"; some or all platforms), in the background. */
 const createReport = async (req, res) => {
     const from = parseDay(req.body?.from, false);
     const to = parseDay(req.body?.to, true);
@@ -87,16 +106,20 @@ const createReport = async (req, res) => {
     if (generating) return res.status(409).json({ message: 'A report is already being generated' });
     const leaderKey = req.body?.leader && req.body.leader !== 'all' ? String(req.body.leader) : null;
     if (leaderKey && !leaderByKey(leaderKey)) return res.status(400).json({ message: 'Unknown leader' });
+    const PLATFORMS = ['x', 'facebook', 'instagram', 'youtube'];
+    const platforms = [...new Set((Array.isArray(req.body?.platforms) ? req.body.platforms : []).map(String))];
+    if (platforms.some((p) => !PLATFORMS.includes(p))) return res.status(400).json({ message: 'Unknown platform' });
+    const chosen = platforms.length === PLATFORMS.length ? [] : platforms;
     const { profile } = await loadProfile();
     const { scope, leader } = scopeOf(profile, leaderKey);
     const report = await SubjectReport.create({
         title: scope === 'leader' ? leader.name : 'All leaders',
         leader_key: leaderKey,
+        platforms: chosen,
         status: 'generating', range_from: from, range_to: to, generated_by: userId(req),
     });
     generating = true;
-    completeReport(report.id, { profile, leader, scope, from, to })
-        .catch((err) => console.error('[subjectReports] report failed:', err.message))
+    runInWorker(report.id, { profile, leader, scope, from, to, platforms: chosen })
         .finally(() => { generating = false; });
     res.status(202).json({ report: { id: report.id, status: report.status, range_from: from, range_to: to } });
 };
@@ -107,11 +130,11 @@ const createReport = async (req, res) => {
  */
 const exportPosts = async (req, res) => {
     if (req.query.tone && !['positive', 'negative', 'neutral'].includes(req.query.tone)) return res.status(400).json({ message: 'Invalid tone' });
-    const report = await SubjectReport.findOne({ id: String(req.query.report || '') }).select('id leader_key range_from range_to').lean();
+    const report = await SubjectReport.findOne({ id: String(req.query.report || '') }).select('id leader_key platforms range_from range_to').lean();
     if (!report) return res.status(404).json({ message: 'Report not found' });
     const { profile } = await loadProfile();
     const { scope, leader } = scopeOf(profile, report.leader_key);
-    let posts = (await loadPosts({ from: report.range_from, to: report.range_to }, subjectFor(leader, scope)))
+    let posts = (await loadPosts({ from: report.range_from, to: report.range_to, platforms: report.platforms }, subjectFor(leader, scope)))
         .filter((p) => p.analysis.status === 'done' && p.analysis.is_relevant);
     if (req.query.tone) posts = posts.filter((p) => tone(p) === req.query.tone);
     posts.sort((a, b) => (new Date(b.published_at || 0) - new Date(a.published_at || 0)) || String(b._id).localeCompare(String(a._id)));
@@ -152,7 +175,7 @@ const exportPosts = async (req, res) => {
  */
 const startReportPdf = async (req, res) => {
     const report = await SubjectReport.findOne({ id: req.params.reportId })
-        .select('id title leader_key status range_from range_to period_start period_end').lean();
+        .select('id title leader_key platforms status range_from range_to period_start period_end').lean();
     if (!report) return res.status(404).json({ message: 'Report not found' });
     if (report.status !== 'ready') return res.status(409).json({ message: 'The report is not ready yet' });
     // The page is opened at this fixed address (never one taken from the request), signed in with the caller's token.
