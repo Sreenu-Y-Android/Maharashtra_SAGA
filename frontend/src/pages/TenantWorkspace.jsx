@@ -34,7 +34,7 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asi
 /* ─────────────────────────────── Posts ─────────────────────────────── */
 
 const PostsView = ({ eventId, narratives, axisLabel }) => {
-  const [filters, setFilters] = useState({ platform: '', category: '', stance: '', narrative: '', risk: '', sort: 'recent' });
+  const [filters, setFilters] = useState({ show: 'relevant', platform: '', category: '', stance: '', narrative: '', risk: '', sort: 'recent' });
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ posts: [], total: 0 });
   const [loading, setLoading] = useState(false);
@@ -57,6 +57,12 @@ const PostsView = ({ eventId, narratives, axisLabel }) => {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-wrap gap-2 mb-3">
+        <select className={sel} value={filters.show} onChange={setF('show')} title="Which posts to list">
+          <option value="relevant">About the subject (analysed)</option>
+          <option value="all">All collected</option>
+          <option value="pending">Awaiting analysis</option>
+          <option value="unrelated">Not about the subject</option>
+        </select>
         <select className={sel} value={filters.platform} onChange={setF('platform')}>
           <option value="">All platforms</option>{Object.entries(PLATFORM_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
@@ -77,6 +83,16 @@ const PostsView = ({ eventId, narratives, axisLabel }) => {
         </select>
         <span className="text-sm text-slate-500 self-center ml-auto">{fmtNum(data.total)} posts</span>
       </div>
+      {data.summary && (
+        <div className="mb-3 rounded-md border bg-white px-3 py-2 text-sm text-slate-700 flex flex-wrap gap-x-5 gap-y-1">
+          <span><b>{fmtNum(data.summary.collected)}</b> collected</span>
+          <span><b>{fmtNum(data.summary.relevant)}</b> analysed, about the subject (used in reports)</span>
+          <span><b>{fmtNum(data.summary.pending)}</b> awaiting analysis</span>
+          <span><b>{fmtNum(data.summary.unrelated)}</b> not about the subject (same name, off-topic)</span>
+        </div>
+      )}
+      <div className="hidden">
+      </div>
       {loading ? <div className="py-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div> : (
         <div className="space-y-2">
           {data.posts.map((p) => (
@@ -95,6 +111,7 @@ const PostsView = ({ eventId, narratives, axisLabel }) => {
               {p.parent_title && <div className="mt-1 text-xs text-slate-500">Comment on: {p.parent_title}</div>}
               <p className="mt-1 whitespace-pre-wrap text-slate-800">{p.text}</p>
               <div className="flex flex-wrap gap-1 mt-2 text-[11px]">
+                {(!p.analysis || p.analysis.status !== 'done') && <Badge variant="outline" className="border-amber-300 text-amber-800">awaiting analysis</Badge>}
                 <Badge variant="secondary">{CATEGORY_LABEL[p.analysis?.category] || '—'}</Badge>
                 <Badge variant="outline">toward subject: {p.analysis?.stance_toward_subject || '—'}</Badge>
                 <Badge variant="outline">toward {axisLabel}: {p.analysis?.stance_toward_protest || '—'}</Badge>

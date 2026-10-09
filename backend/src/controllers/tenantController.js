@@ -58,7 +58,11 @@ const listPosts = async (req, res) => {
 
     const filter = { tenant_id: req.tenantId, event_id: event.id };
     const { platform, category, stance, narrative, risk, post_type: postType, q } = req.query;
-    if (req.query.include_unrelated !== 'true') filter['analysis.is_relevant'] = true;
+    // show: relevant (default; what reports use) | all | pending (awaiting analysis) | unrelated
+    const show = req.query.show || (req.query.include_unrelated === 'true' ? 'all' : 'relevant');
+    if (show === 'relevant') filter['analysis.is_relevant'] = true;
+    else if (show === 'unrelated') { filter['analysis.status'] = 'done'; filter['analysis.is_relevant'] = false; }
+    else if (show === 'pending') filter['analysis.status'] = { $in: ['pending', 'failed'] };
     if (['x', 'youtube', 'facebook', 'instagram', 'reddit', 'telegram'].includes(platform)) filter.platform = platform;
     // The analyst's band wins over the model's.
     if (['critical', 'high', 'medium', 'low'].includes(risk)) {
@@ -78,7 +82,18 @@ const listPosts = async (req, res) => {
         TenantPost.find(filter).select('-tenant_id -__v').sort(sort).skip((page - 1) * limit).limit(limit).lean(),
         TenantPost.countDocuments(filter),
     ]);
-    res.json({ posts, total, page, limit });
+    // Totals for the whole event, so the page can show collected / analysed / about the subject / awaiting.
+    const byStatus = await TenantPost.aggregate([
+        { $match: { tenant_id: req.tenantId, event_id: event.id } },
+        { $group: { _id: { status: '$analysis.status', relevant: '$analysis.is_relevant' }, n: { $sum: 1 } } },
+    ]);
+    const summary = { collected: 0, relevant: 0, unrelated: 0, pending: 0 };
+    byStatus.forEach(({ _id, n }) => {
+        summary.collected += n;
+        if (_id.status === 'done') summary[_id.relevant ? 'relevant' : 'unrelated'] += n;
+        else summary.pending += n;
+    });
+    res.json({ posts, total, page, limit, summary });
 };
 
 const listReports = async (req, res) => {
