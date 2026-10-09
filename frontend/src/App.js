@@ -13,6 +13,9 @@ import { BRAND, LOCAL_LOGO } from './config/partyMedia';
 // Overview (pages/DashboardNew) is hidden in this deployment; /dashboard redirects below.
 // const Dashboard = lazy(() => import('./pages/DashboardNew'));
 const CMDashboard = lazy(() => import('./pages/CMDashboard'));
+// Isolated workspace for tenant (non-Maharashtra) users.
+const TenantWorkspace = lazy(() => import('./pages/TenantWorkspace'));
+const TenantPrintReport = lazy(() => import('./pages/tenant/PrintReport'));
 const Sources = lazy(() => import('./pages/Sources'));
 const ContentFeed = lazy(() => import('./pages/ContentFeed'));
 const YouTubeMonitor = lazy(() => import('./pages/YouTubeMonitor'));
@@ -94,6 +97,9 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   {/* Print view of a monitoring report; the server's PDF renderer opens it. */}
                   <Route path="/subject-reports/print/:reportId" element={<ProtectedRoute><SubjectReportPrint /></ProtectedRoute>} />
+                  {/* Tenant workspace and its print view (the server's PDF renderer opens the latter). */}
+                  <Route path="/workspace/print/:reportId" element={<ProtectedRoute tenantWorkspace><TenantPrintReport /></ProtectedRoute>} />
+                  <Route path="/workspace" element={<ProtectedRoute tenantWorkspace><TenantWorkspace /></ProtectedRoute>} />
                   <Route
                     path=""
                     element={

@@ -59,6 +59,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // middleware/verticalMiddleware.js.
 app.use(require('./middleware/verticalMiddleware').openVerticalContext);
 
+// Tenant users may reach only their own workspace routes; must run before every /api router.
+app.use('/api', require('./middleware/tenantGuard').tenantGuard);
+
 // Routes
 app.use('/api/deepfake', require('./routes/deepfakeRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -112,6 +115,7 @@ app.use('/api/voter-profiles', require('./routes/voterProfileRoutes'));
 app.use('/api/booth-imports', require('./routes/boothImportRoutes'));
 app.use('/api/web-articles', require('./routes/webArticleRoutes'));
 app.use('/api/youtube-live', require('./routes/youtubeLiveRoutes'));
+app.use('/api/tenant', require('./routes/tenantRoutes'));
 
 // Proxy for Location Service (to share ngrok tunnel). Signed-in users only,
 // and only the two endpoints the frontend uses, so it cannot be used to reach

@@ -21,6 +21,7 @@
 
 const ConstituencyMaster = require('../models/ConstituencyMaster');
 const User = require('../models/User');
+const { mhUserFilter } = require('../config/tenancy');
 const {
     CABINET_MINISTERS, PRESIDING_OFFICERS, PARTY_ORG_LEADERS, OPPOSITION_LEADERS, acKey: rosterAcKey,
 } = require('../config/politicalData');
@@ -340,11 +341,11 @@ const resolveRouting = async (acName) => {
 
     // Login users for this AC and its LS seat.
     const [mlaUsers, mpUsers] = await Promise.all([
-        User.find({ role: 'mla', assigned_constituency: { $regex: `^${escapeRegex(acDisplay)}$`, $options: 'i' } })
+        User.find({ ...mhUserFilter(), role: 'mla', assigned_constituency: { $regex: `^${escapeRegex(acDisplay)}$`, $options: 'i' } })
             .select('id email full_name is_active').lean(),
         lsKey
             // Stored as the slug ("raipur"); older rows may hold the display name.
-            ? User.find({ role: 'mp', assigned_lok_sabha: { $regex: `^(${escapeRegex(lsKey)}|${escapeRegex(lokSabha || lsKey)})$`, $options: 'i' } })
+            ? User.find({ ...mhUserFilter(), role: 'mp', assigned_lok_sabha: { $regex: `^(${escapeRegex(lsKey)}|${escapeRegex(lokSabha || lsKey)})$`, $options: 'i' } })
                 .select('id email full_name is_active').lean()
             : Promise.resolve([]),
     ]);

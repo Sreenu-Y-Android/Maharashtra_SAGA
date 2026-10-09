@@ -200,10 +200,24 @@ const startPdfJob = ({ userId, name, ...opts }) => {
     return job;
 };
 
+/**
+ * Run fn on the same one-at-a-time render queue (used by the tenant workspace's
+ * PDFs, so the two never render at once on the shared server).
+ */
+const enqueue = (fn) => {
+    const run = queue.then(fn);
+    queue = run.catch(() => {});
+    return run;
+};
+
 /** A job, only for the user who created it. */
 const getJob = (userId, id) => {
     const job = jobs.get(id);
     return job && job.user_id === userId ? job : null;
 };
 
-module.exports = { renderReportPdf, startPdfJob, getJob };
+module.exports = {
+    renderReportPdf, startPdfJob, getJob,
+    // Shared with services/tenant/tenantPdfService.js.
+    enqueue, printPage, joinAndNumber, ensureMemory, APPENDIX_SLICE, MIN_FREE_MB_REPORT, MIN_FREE_MB_SLICE,
+};

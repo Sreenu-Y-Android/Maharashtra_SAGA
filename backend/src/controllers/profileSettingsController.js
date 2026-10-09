@@ -11,6 +11,7 @@
 const MlaProfileSettings = require('../models/MlaProfileSettings');
 const GlobalProfileSettings = require('../models/GlobalProfileSettings');
 const User = require('../models/User');
+const { mhUserFilter } = require('../config/tenancy');
 const Grievance = require('../models/Grievance');
 const Alert = require('../models/Alert');
 const {
@@ -66,7 +67,7 @@ const listMlaProfiles = async (req, res) => {
                 { $match: { constituency: { $ne: null } } },
                 { $group: { _id: '$constituency', count: { $sum: 1 } } },
             ]),
-            User.find({ role: { $in: ['mla', 'mp'] } })
+            User.find({ role: { $in: ['mla', 'mp'] }, ...mhUserFilter() })
                 .select('id email role assigned_constituency assigned_lok_sabha is_active last_login_at')
                 .lean(),
         ]);
@@ -137,6 +138,7 @@ const getMlaProfile = async (req, res) => {
         const key = normKey(canonical);
         const logins = await User.find({
             role: { $in: ['mla', 'mp'] },
+            ...mhUserFilter(),
             $or: [
                 { assigned_constituency: canonical },
                 // Stored as the slug; older rows may hold the display name ("Raipur").
