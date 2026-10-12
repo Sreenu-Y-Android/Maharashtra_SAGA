@@ -23,6 +23,8 @@ const pct1 = (n) => `${Number(n || 0).toFixed(1)}%`;
 const pct0 = (n) => `${Math.round(Number(n || 0))}%`;
 const share = (n, t) => (t ? (100 * n) / t : 0);
 const lakh = (n) => (n / 1e5 >= 100 ? (n / 1e5).toFixed(0) : (n / 1e5).toFixed(n / 1e5 >= 10 ? 1 : 2));
+// Lakh only when the largest bar reaches one lakh; small reports read better as plain counts.
+const unitFor = (rows) => (Math.max(0, ...rows.map((r) => r.value || 0)) >= 1e5 ? { unit: ', lakh', fmt: lakh } : { unit: '', fmt: (n) => fmt(n) });
 const crore = (n) => (n >= 1e7 ? `${(n / 1e7).toFixed(1)} crore` : n >= 1e5 ? `${(n / 1e5).toFixed(1)} lakh` : fmt(n));
 const shortDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' }) : '');
 const dayOf = (iso) => (iso ? new Date(new Date(iso).getTime() + 5.5 * 3600000).toISOString().slice(0, 10) : null);
@@ -459,7 +461,7 @@ const SituationDeck = ({ report, workspace }) => {
         <Title>A few accounts set the tone</Title>
         <div style={{ display: 'flex', gap: 48 }}>
           <div style={{ flex: 1.6 }}>
-            <HBars caption="Engagement score, lakh (top accounts)" labelWidth={300} valueFmt={lakh} rows={accounts} barH={38} gap={16} />
+            <HBars caption={`Engagement score${unitFor(accounts).unit} (top accounts)`} labelWidth={300} valueFmt={unitFor(accounts).fmt} rows={accounts} barH={38} gap={16} />
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {topByPosts && <Tile value={pct1(share(topByPosts.relevant, total))} label={`of posts are on ${PLATFORM_LABEL[topByPosts.platform]}`} color={C.orange} big={46} />}
@@ -479,7 +481,7 @@ const SituationDeck = ({ report, workspace }) => {
         <Title>The claims that matter can be checked</Title>
         <div style={{ display: 'flex', gap: 48 }}>
           <div style={{ flex: 1.7 }}>
-            <HBars caption="Engagements on the top post carrying each claim, lakh" labelWidth={360} valueFmt={lakh} rows={claims} barH={38} gap={16} />
+            <HBars caption={`Engagements on the top post carrying each claim${unitFor(claims).unit}`} labelWidth={360} valueFmt={unitFor(claims).fmt} rows={claims} barH={38} gap={16} />
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 22 }}>
             {b.callouts?.claims_quote && <Card color={C.green} dark title="A model answer" style={{ flex: 1 }}><i style={{ fontSize: 21 }}>{b.callouts.claims_quote}</i></Card>}

@@ -166,7 +166,7 @@ const ExecutiveReport = ({ report }) => {
         {listJoin(narratives.slice(0, 4).map((n) => lcFirst(n.label)))}.
       </P>
       <P>
-        {pctTxt(criticalOfSubject)} of relevant posts criticise {name} directly and {pctTxt(stanceP('critical').pct)} criticise {axis}, while {pctTxt(protestSupport)} support {axis}
+        {pctTxt(criticalOfSubject)} of relevant posts criticise {name} directly and {pctTxt(stanceP('critical').pct)} criticise {axis}, while {pctTxt(protestSupport)} support {axis}{' '}
         and {pctTxt(stanceS('supportive').pct)} support {name} directly.
       </P>
       {peak && (
