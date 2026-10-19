@@ -1,0 +1,276 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Download, FileSpreadsheet, FileText, Loader2, Eye } from 'lucide-react';
+import api from '../../lib/api';
+import { Button } from '../../components/ui/button';
+import ReportBrief from './ReportBrief';
+import ExecutiveReport from './ExecutiveReport';
+import SituationDeck from './SituationDeck';
+import { exportPostsExcel } from './exportPostsExcel';
+
+/**
+ * Pick a period, generate a report for it, and download it as PDF (or the
+ * period's posts as Excel, split by tone). Earlier reports stay listed.
+ */
+
+const istToday = () => new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);
+const istDaysAgo = (n) => new Date(Date.now() + 5.5 * 3600000 - n * 86400000).toISOString().slice(0, 10);
+/** First and last day (YYYY-MM-DD) of the month `back` months before the current IST month. */
+const istMonth = (back) => {
+  const [y, m] = istToday().split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 - back, 1));
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
+  return [d.toISOString().slice(0, 10), last.toISOString().slice(0, 10)];
+};
+// Quick ranges; ['', ''] is all time (no date limit).
+const PRESETS = [
+  ['Today', () => [istToday(), istToday()]],
+  ['Yesterday', () => [istDaysAgo(1), istDaysAgo(1)]],
+  ['Last 7 days', () => [istDaysAgo(6), istToday()]],
+  ['Last 30 days', () => [istDaysAgo(29), istToday()]],
+  ['This month', () => [istMonth(0)[0], istToday()]],
+  ['Last month', () => istMonth(1)],
+  ['All time', () => ['', '']],
+];
+const PLATFORMS = [['x', 'X'], ['facebook', 'Facebook'], ['instagram', 'Instagram'], ['youtube', 'YouTube']];
+const istDay = (d) => (d ? new Date(new Date(d).getTime() + 5.5 * 3600000).toISOString().slice(0, 10) : null);
+const fmtDay = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) : '');
+const fmtDateTime = (d) => (d ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
+
+const periodLabel = (r) => (r.range_from || r.range_to
+  ? `${r.range_from ? fmtDay(r.range_from) : 'Start'} – ${r.range_to ? fmtDay(r.range_to) : 'latest'}`
+  : `All time${r.period_start ? ` (${fmtDay(r.period_start)} – ${fmtDay(r.period_end)})` : ''}`);
+
+const ALIGNMENT = { ally: 'ruling side', opposition: 'opposition', none: 'not aligned' };
+
+/**
+ * Reports for a period on one leader (only posts about them, measured toward them)
+ * or on all leaders (every monitored post): the Reports page's "Monitoring Reports" tab.
+ */
+const ReportsPanel = ({ workspace, leaders = [], defaultLeader, axisLabel = 'the state government' }) => {
+  const [leader, setLeader] = useState(defaultLeader || 'all');
+  const [from, setFrom] = useState(istDaysAgo(6));
+  const [to, setTo] = useState(istToday());
+  const [platforms, setPlatforms] = useState(PLATFORMS.map(([k]) => k));
+  const togglePlatform = (k) => setPlatforms((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+  const [reports, setReports] = useState([]);
+  const [open, setOpen] = useState(null);
+  const [busy, setBusy] = useState({});
+  // Which format of the open report is shown: the detailed brief or the executive report.
+  const [format, setFormat] = useState('detailed');
+
+  const loadList = useCallback(async () => {
+    const { data } = await api.get('/subject-reports');
+    setReports(data.reports);
+    return data.reports;
+  }, []);
+
+  const openReport = useCallback(async (id) => {
+    const { data } = await api.get(`/subject-reports/${id}`);
+    setOpen(data.report);
+  }, []);
+
+  useEffect(() => {
+    loadList().then((list) => {
+      const latest = list.find((r) => r.status === 'ready');
+      if (latest) openReport(latest.id);
+    }).catch(() => toast.error('Could not load reports'));
+  }, [loadList, openReport]);
+
+  // Poll while any report is generating.
+  const pending = reports.some((r) => r.status === 'generating');
+  useEffect(() => {
+    if (!pending) return undefined;
+    const t = setInterval(async () => {
+      const before = new Set(reports.filter((r) => r.status === 'ready').map((r) => r.id));
+      const list = await loadList().catch(() => null);
+      const done = list?.find((r) => r.status === 'ready' && !before.has(r.id));
+      if (done) { toast.success('Report ready'); openReport(done.id); }
+      const failed = list?.find((r) => r.status === 'failed' && reports.find((x) => x.id === r.id)?.status === 'generating');
+      if (failed) toast.error(`Report failed: ${failed.error || 'unknown error'}`);
+    }, 4000);
+    return () => clearInterval(t);
+  }, [pending, reports, loadList, openReport]);
+
+  const preset = (range) => { const [f, t] = range(); setFrom(f); setTo(t); };
+
+  const generate = async () => {
+    if (from && to && from > to) { toast.error('"From" must be on or before "To"'); return; }
+    try {
+      if (!platforms.length) { toast.error('Choose at least one platform'); return; }
+      await api.post('/subject-reports', { from: from || null, to: to || null, leader, platforms });
+      toast.success('Generating report…');
+      loadList();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Could not start the report');
+    }
+  };
+
+  // The server renders the PDF in the background (queued, one at a time); the page polls the
+  // job and downloads the finished file, so no browser print header or footer ends up in it.
+  const downloadPdf = async (r, withPosts = false, executive = false, presentation = false) => {
+    const key = `pdf${presentation ? 's' : ''}${executive ? 'e' : ''}${withPosts ? 'p' : ''}${r.id}`;
+    setBusy((b) => ({ ...b, [key]: true }));
+    const note = toast.loading(withPosts ? 'Preparing PDF with all posts — this can take a few minutes…' : 'Preparing PDF…');
+    try {
+      const { data } = await api.post(`/subject-reports/${r.id}/pdf`, { posts: withPosts, format: presentation ? 'presentation' : executive ? 'executive' : 'detailed' });
+      let job = data.job;
+      const started = Date.now();
+      while (job.status === 'queued' || job.status === 'running') {
+        if (Date.now() - started > 30 * 60000) throw new Error('The PDF is taking too long. Please try again later.');
+        await new Promise((res) => setTimeout(res, 3000));
+        job = (await api.get(`/subject-reports/pdf-jobs/${job.id}`)).data.job;
+        if (job.status === 'queued') toast.loading('Waiting for another PDF to finish…', { id: note });
+        else if (job.status === 'running') toast.loading(withPosts ? 'Preparing PDF with all posts — this can take a few minutes…' : 'Preparing PDF…', { id: note });
+      }
+      if (job.status !== 'ready') throw new Error(job.error || 'Could not prepare the PDF');
+      const res = await api.get(`/subject-reports/pdf-jobs/${job.id}/file`, { responseType: 'blob', timeout: 300000 });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = job.name || 'report.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast.success('PDF downloaded', { id: note });
+    } catch (e) {
+      toast.error(e.response?.data?.message || e.message || 'Could not prepare the PDF', { id: note });
+    } finally {
+      setBusy((b) => ({ ...b, [key]: false }));
+    }
+  };
+
+  const downloadExcel = async (r) => {
+    setBusy((b) => ({ ...b, [`xls${r.id}`]: true }));
+    try {
+      const f = istDay(r.range_from);
+      const t = istDay(r.range_to);
+      const { data } = await api.get('/subject-reports/posts/export', { params: { report: r.id }, timeout: 180000 });
+      exportPostsExcel(data.posts, { title: r.title || 'Monitoring report', from: f, to: t });
+    } catch (e) {
+      toast.error('Could not export posts');
+    } finally {
+      setBusy((b) => ({ ...b, [`xls${r.id}`]: false }));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg border p-4 print:hidden">
+        <div className="font-semibold text-slate-900 mb-2">Generate a report</div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-sm">
+            <span className="block text-xs text-slate-500 mb-1">Leader</span>
+            <select className="border rounded-md px-2 py-1.5 text-sm bg-white max-w-[280px]" value={leader} onChange={(e) => setLeader(e.target.value)}>
+              <option value="all">All leaders (every monitored post)</option>
+              {leaders.map((l) => <option key={l.key} value={l.key}>{l.name} — {(l.role || '').split(';')[0]}</option>)}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="block text-xs text-slate-500 mb-1">From</span>
+            <input type="date" className="border rounded-md px-2 py-1.5 text-sm" value={from} max={to || istToday()} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label className="text-sm">
+            <span className="block text-xs text-slate-500 mb-1">To</span>
+            <input type="date" className="border rounded-md px-2 py-1.5 text-sm" value={to} min={from || undefined} max={istToday()} onChange={(e) => setTo(e.target.value)} />
+          </label>
+          <div className="flex flex-wrap gap-1">
+            {PRESETS.map(([label, range]) => {
+              const [f, t] = range();
+              const active = from === f && to === t;
+              return (
+                <Button key={label} type="button" variant={active ? 'default' : 'outline'} size="sm" onClick={() => preset(range)} aria-pressed={active}>{label}</Button>
+              );
+            })}
+          </div>
+          <div className="text-sm">
+            <span className="block text-xs text-slate-500 mb-1">Platforms</span>
+            <div className="flex flex-wrap gap-3 py-1.5">
+              {PLATFORMS.map(([k, label]) => (
+                <label key={k} className="inline-flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={platforms.includes(k)} onChange={() => togglePlatform(k)} />{label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <Button onClick={generate} disabled={pending} className="ml-auto">
+            {pending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+            {pending ? 'Generating…' : 'Generate report'}
+          </Button>
+        </div>
+        <p className="text-xs text-slate-600 mt-2">
+          {(() => {
+            const l = leaders.find((x) => x.key === leader);
+            if (!l) return `All leaders: every monitored post in the period, measured toward ${leaders.find((x) => x.key === defaultLeader)?.name || 'the default subject'}.`;
+            const side = l.alignment === 'opposition'
+              ? `support for ${axisLabel} counts as negative for him or her, criticism of it as positive`
+              : l.alignment === 'ally' ? `support for ${axisLabel} counts as positive, criticism of it as negative` : `only direct stance toward ${l.name} counts`;
+            return `${l.name} (${ALIGNMENT[l.alignment] || 'not aligned'}): only posts that name or target ${l.name}, or come from their own account. Tone is measured toward ${l.name}; ${side}.`;
+          })()}
+        </p>
+        <p className="text-xs text-slate-500 mt-2">Dates are Indian Standard Time. The report covers posts published in the period; positive, negative and neutral posts are broken down separately, and the Excel download has one sheet for each. Each report comes in two formats: the short “Executive PDF” and the full “Detailed PDF”; “Detailed + posts” adds every post in the period, grouped positive, negative and neutral, with post and footage links. Both download a ready PDF file.</p>
+      </div>
+
+      {reports.length > 0 && (
+        <div className="bg-white rounded-lg border print:hidden overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs text-slate-500">
+              <tr><th className="p-2">Report</th><th className="p-2">Period</th><th className="p-2">Platforms</th><th className="p-2">Posts</th><th className="p-2">Created</th><th className="p-2">Status</th><th className="p-2 text-right">Download</th></tr>
+            </thead>
+            <tbody>
+              {reports.map((r) => (
+                <tr key={r.id} className={`border-t ${open?.id === r.id ? 'bg-indigo-50' : ''}`}>
+                  <td className="p-2 font-medium">{r.title || 'All leaders'}</td>
+                  <td className="p-2">{periodLabel(r)}</td>
+                  <td className="p-2 text-slate-600">{(r.platforms || []).length ? r.platforms.map((k) => (PLATFORMS.find(([x]) => x === k) || [k, k])[1]).join(', ') : 'All'}</td>
+                  <td className="p-2">{r.status === 'ready' ? Number(r.post_count || 0).toLocaleString('en-IN') : '—'}</td>
+                  <td className="p-2 text-slate-500">{fmtDateTime(r.created_at)}</td>
+                  <td className="p-2">{r.status === 'generating' ? <span className="inline-flex items-center gap-1 text-amber-700"><Loader2 className="h-3 w-3 animate-spin" />generating</span> : r.status === 'failed' ? <span className="text-red-700">failed</span> : <span className="text-emerald-700">ready</span>}</td>
+                  <td className="p-2">
+                    {r.status === 'ready' && (
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openReport(r.id)}><Eye className="h-4 w-4 mr-1" />View</Button>
+                        <Button variant="outline" size="sm" onClick={() => downloadPdf(r, false, false, true)} disabled={busy[`pdfs${r.id}`]} title="Situation assessment and way forward, as presentation slides">
+                          {busy[`pdfs${r.id}`] ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Presentation PDF
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => downloadPdf(r, false, true)} disabled={busy[`pdfe${r.id}`]} title="The short executive-format report">
+                          {busy[`pdfe${r.id}`] ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Executive PDF
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => downloadPdf(r)} disabled={busy[`pdf${r.id}`]} title="The detailed report without the post list">
+                          {busy[`pdf${r.id}`] ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Detailed PDF
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => downloadPdf(r, true)} disabled={busy[`pdfp${r.id}`]} title="The detailed report plus every post in the period, grouped by tone">
+                          {busy[`pdfp${r.id}`] ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Detailed + posts
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => downloadExcel(r)} disabled={busy[`xls${r.id}`]}>
+                          {busy[`xls${r.id}`] ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-1" />}Excel
+                        </Button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="bg-white rounded-lg p-4 md:p-6 print:p-0">
+        {open && (
+          <div className="flex gap-1 mb-4 print:hidden" role="tablist">
+            {[['presentation', 'Presentation'], ['executive', 'Executive report'], ['detailed', 'Detailed report']].map(([k, label]) => (
+              <Button key={k} type="button" size="sm" variant={format === k ? 'default' : 'outline'} aria-pressed={format === k} onClick={() => setFormat(k)}>{label}</Button>
+            ))}
+          </div>
+        )}
+        {!open ? <p className="text-slate-600">No report yet. Choose a period and generate one.</p>
+          : format === 'presentation' ? <div className="overflow-x-auto"><SituationDeck report={open} workspace={workspace} /></div>
+          : format === 'executive' ? <ExecutiveReport report={open} />
+            : <ReportBrief report={open} workspace={workspace} onDownloadPdf={() => downloadPdf(open)} />}
+      </div>
+    </div>
+  );
+};
+
+export default ReportsPanel;

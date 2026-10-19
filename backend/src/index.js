@@ -59,6 +59,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // middleware/verticalMiddleware.js.
 app.use(require('./middleware/verticalMiddleware').openVerticalContext);
 
+// Tenant users may reach only their own workspace routes; must run before every /api router.
+app.use('/api', require('./middleware/tenantGuard').tenantGuard);
+
 // Routes
 app.use('/api/deepfake', require('./routes/deepfakeRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -98,6 +101,8 @@ app.use('/api/telegram', require('./routes/telegramRoutes'));
 app.use('/api/unrest', require('./routes/unrest.routes'));
 app.use('/api/news',  require('./routes/newsRoutes'));
 app.use('/api/intelligence-reports', require('./routes/intelligenceReportRoutes'));
+// Monitoring reports (presentation, executive, detailed, detailed + posts) on the whole monitored conversation.
+app.use('/api/subject-reports', require('./routes/subjectReportRoutes'));
 app.use('/api/search-trends', require('./routes/searchTrends'));
 app.use('/api/constituency-intel', require('./routes/constituencyIntelligenceRoutes'));
 app.use('/api/geo-intel', require('./routes/geoIntelRoutes'));
@@ -110,6 +115,7 @@ app.use('/api/voter-profiles', require('./routes/voterProfileRoutes'));
 app.use('/api/booth-imports', require('./routes/boothImportRoutes'));
 app.use('/api/web-articles', require('./routes/webArticleRoutes'));
 app.use('/api/youtube-live', require('./routes/youtubeLiveRoutes'));
+app.use('/api/tenant', require('./routes/tenantRoutes'));
 
 // Proxy for Location Service (to share ngrok tunnel). Signed-in users only,
 // and only the two endpoints the frontend uses, so it cannot be used to reach
