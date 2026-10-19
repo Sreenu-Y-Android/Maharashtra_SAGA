@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantDb = require('../../config/tenantDb');
 const { v4: uuidv4 } = require('uuid');
 const tenantScoped = require('./tenantScoped');
 
@@ -135,4 +136,4 @@ tenantEventSchema.pre('save', function touch(next) {
 // Event ids are unique per tenant (specs pin them), not across tenants.
 tenantEventSchema.index({ tenant_id: 1, id: 1 }, { unique: true });
 
-module.exports = mongoose.model('TenantEvent', tenantEventSchema);
+module.exports = tenantDb.model('TenantEvent', tenantEventSchema);

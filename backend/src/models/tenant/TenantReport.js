@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantDb = require('../../config/tenantDb');
 const { v4: uuidv4 } = require('uuid');
 const tenantScoped = require('./tenantScoped');
 
@@ -23,4 +24,4 @@ const tenantReportSchema = new mongoose.Schema({
 tenantReportSchema.plugin(tenantScoped);
 tenantReportSchema.index({ tenant_id: 1, event_id: 1, created_at: -1 });
 
-module.exports = mongoose.model('TenantReport', tenantReportSchema);
+module.exports = tenantDb.model('TenantReport', tenantReportSchema);

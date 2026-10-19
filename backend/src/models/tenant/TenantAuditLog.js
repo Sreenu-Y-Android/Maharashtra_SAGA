@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantDb = require('../../config/tenantDb');
 const tenantScoped = require('./tenantScoped');
 
 const tenantAuditLogSchema = new mongoose.Schema({
@@ -12,4 +13,4 @@ const tenantAuditLogSchema = new mongoose.Schema({
 
 tenantAuditLogSchema.plugin(tenantScoped);
 
-module.exports = mongoose.model('TenantAuditLog', tenantAuditLogSchema);
+module.exports = tenantDb.model('TenantAuditLog', tenantAuditLogSchema);

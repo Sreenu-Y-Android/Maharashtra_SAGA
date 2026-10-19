@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantDb = require('../../config/tenantDb');
 const tenantScoped = require('./tenantScoped');
 
 const mediaSchema = new mongoose.Schema({
@@ -120,4 +121,4 @@ tenantPostSchema.plugin(tenantScoped);
 tenantPostSchema.index({ tenant_id: 1, event_id: 1, platform: 1, platform_post_id: 1 }, { unique: true });
 tenantPostSchema.index({ tenant_id: 1, event_id: 1, published_at: -1 });
 
-module.exports = mongoose.model('TenantPost', tenantPostSchema);
+module.exports = tenantDb.model('TenantPost', tenantPostSchema);

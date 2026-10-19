@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const tenantDb = require('../../config/tenantDb');
 const tenantScoped = require('./tenantScoped');
 
 /** One row per tenant: the workspace's name and who it is monitoring for. */
@@ -12,4 +13,4 @@ const tenantWorkspaceSchema = new mongoose.Schema({
 
 tenantWorkspaceSchema.plugin(tenantScoped);
 
-module.exports = mongoose.model('TenantWorkspace', tenantWorkspaceSchema);
+module.exports = tenantDb.model('TenantWorkspace', tenantWorkspaceSchema);
