@@ -1,18 +1,12 @@
-const axios = require('axios');
 const blugateClient = require('./blugateClient');
 
-const INSTAGRAM_BASE = `${blugateClient.GATEWAY_BASE}/instagram`;
+// Every Instagram call goes through blugateClient.call(): BluGate first, and straight to
+// RAPIDAPI_INSTAGRAM_HOST with RAPIDAPI_INSTAGRAM_KEYS only when BLUGATE_FALLBACK_ENABLED
+// is on and BluGate fails (or SOCIAL_API_MODE=rapidapi).
+const providerLabel = () => blugateClient.providerLabel();
 
-// Direct RapidAPI mode. When RAPIDAPI_INSTAGRAM_KEYS is set, Instagram calls go
-// straight to RAPIDAPI_INSTAGRAM_HOST with that key; when it is unset, they go
-// through BluGate exactly as before. Only the first key is used (no rotation).
-const getDirectKey = () => String(process.env.RAPIDAPI_INSTAGRAM_KEYS || '').split(',')[0].trim().replace(/^"|"$/g, '');
-const getDirectHost = () => String(process.env.RAPIDAPI_INSTAGRAM_HOST || 'instagram120.p.rapidapi.com').trim();
-const useDirect = () => !!getDirectKey();
-const providerLabel = () => (useDirect() ? 'RapidAPI' : 'BluGate');
-
-/** True when Instagram can be fetched, either directly or through BluGate. */
-const hasCredentials = () => useDirect() || blugateClient.hasCredentials();
+/** True when Instagram can be fetched, through BluGate or a ready direct fallback. */
+const hasCredentials = () => blugateClient.hasCredentials('instagram');
 
 // ─── Cooldown Tracking (single BluGate client key — no rotation) ──────────
 let cooldownUntil = 0;
@@ -68,25 +62,13 @@ const rapidPost = async (path, data, _retryCount = 0) => {
     }
 
     try {
-        const direct = useDirect();
-        const response = await axios.post(
-            direct ? `https://${getDirectHost()}${path}` : `${INSTAGRAM_BASE}${path}`,
+        const response = await blugateClient.call('instagram', {
+            method: 'post',
+            path,
             data,
-            {
-                headers: direct
-                    ? {
-                        'x-rapidapi-key': getDirectKey(),
-                        'x-rapidapi-host': getDirectHost(),
-                        'Content-Type': 'application/json'
-                    }
-                    : {
-                        ...blugateClient.getHeaders(),
-                        'Content-Type': 'application/json'
-                    },
-                timeout: 30000, // 30s timeout
-                ...(direct ? {} : blugateClient.responseOptions()),
-            }
-        );
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 30000, // 30s timeout
+        });
 
         markSuccess();
         return response;
@@ -166,6 +148,36 @@ const fetchUserPosts = async (username, maxId = "") => {
         const body = { username: cleanUsername };
         if (maxId) body.maxId = maxId;
         const response = await rapidPost('/api/instagram/posts', body);
+        return response?.data || null;
+    } catch (error) {
+        return null;
+    }
+};
+
+/**
+ * One page of an account's reels or of posts that tag it
+ * (feed = 'reels' | 'taggedPosts'); same paging as fetchUserPosts.
+ */
+const fetchUserFeed = async (feed, username, maxId = "") => {
+    const cleanUsername = normalizeUsername(username);
+    if (!cleanUsername || !['reels', 'taggedPosts'].includes(feed)) return null;
+    try {
+        const body = { username: cleanUsername };
+        if (maxId) body.maxId = maxId;
+        const response = await rapidPost(`/api/instagram/${feed}`, body);
+        return response?.data || null;
+    } catch (error) {
+        return null;
+    }
+};
+
+/** One page (15) of a post's comments, newest first; pass the previous page's next_min_id as minId. */
+const fetchComments = async (shortcode, minId = "") => {
+    if (!shortcode) return null;
+    try {
+        const body = { shortcode };
+        if (minId) body.minId = minId;
+        const response = await rapidPost('/api/instagram/comments', body);
         return response?.data || null;
     } catch (error) {
         return null;
@@ -343,6 +355,8 @@ const searchPosts = async (query, limit = IG_DEFAULT_LIMIT) => {
 
 module.exports = {
     fetchUserPosts,
+    fetchUserFeed,
+    fetchComments,
     fetchUserStories,
     fetchUserProfile,
     fetchInstagramPostDetail,
