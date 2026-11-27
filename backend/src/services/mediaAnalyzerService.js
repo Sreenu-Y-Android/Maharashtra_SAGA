@@ -259,12 +259,8 @@ async function downloadTweetMedia(tweetId, originalUrl) {
     for (const endpoint of ['tweet-v2', 'tweet']) {
       try {
         const { params } = rapidApiXService.prepareXRequest(endpoint, { pid: tweetId });
-        const response = await blugateClient.withRateLimitRetry(() => axios.get(`${blugateClient.GATEWAY_BASE}/twitter/${endpoint}`, {
-          params,
-          headers: blugateClient.getHeaders(),
-          timeout: 30000,
-          ...blugateClient.responseOptions(),
-        }), { label: 'BluGate X tweet' });
+        // BluGate first, the provider directly when the fallback is on (blugateClient.call).
+        const response = await blugateClient.call('twitter', { path: endpoint, params, timeout: 30000 });
 
         let result = response.data?.result || response.data?.data || response.data;
         for (let i = 0; i < 6; i++) {

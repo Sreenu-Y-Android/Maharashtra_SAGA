@@ -1,8 +1,7 @@
-const axios = require('axios');
 const { responseLooksDoubleEncoded } = require('../utils/textEncoding');
 const blugateClient = require('./blugateClient');
 
-const TWITTER_BASE = `${blugateClient.GATEWAY_BASE}/twitter`;
+const TWITTER_BASE = blugateClient.baseUrl('twitter');
 
 // Every twitter241 route BluGate exposes, with its required query params
 // (from BluGate_Provider_Endpoints.xlsx). Anything not listed here does not
@@ -97,15 +96,14 @@ const rapidRequestX = async (config, retryCount = 0) => {
     const { params } = prepareXRequest(endpoint, config.params);
 
     try {
-        const response = await axios({
-            ...config,
+        // The one call site: BluGate first, the provider directly when the fallback is on.
+        const response = await blugateClient.call('twitter', {
+            method: config.method || 'get',
+            path: endpoint,
             params,
-            headers: {
-                ...config.headers,
-                ...blugateClient.getHeaders()
-            },
+            data: config.data,
+            headers: config.headers,
             timeout: 30000, // 30s timeout
-            ...blugateClient.responseOptions(),
         });
 
         // The provider intermittently serves a response whose UTF-8 was decoded as

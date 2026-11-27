@@ -1,4 +1,3 @@
-const axios = require('axios');
 const { DEFAULT_VERTICAL } = require('../config/verticals');
 const { topicFor } = require('../utils/mhTopicLexicon');
 const { interleaveByVertical } = require('../utils/tenantRotation');
@@ -535,11 +534,8 @@ const rapidApiGet = async (path, rawParams, maxRetries = 2) => {
     // strips blank values, so no null-param hit ever reaches BluGate.
     const { params } = rapidApiXService.prepareXRequest(path, rawParams);
     for (let attempt = 0; ; attempt++) {
-        const res = await blugateClient.withRateLimitRetry(() => axios.get(`${blugateClient.GATEWAY_BASE}/twitter${path}`, {
-            params,
-            headers: blugateClient.getHeaders(),
-            ...blugateClient.responseOptions(),
-        }), { label: 'BluGate X search' });
+        // BluGate first, the provider directly when the fallback is on (blugateClient.call).
+        const res = await blugateClient.call('twitter', { path, params });
 
         if (!responseLooksDoubleEncoded(res.data)) return res;
 

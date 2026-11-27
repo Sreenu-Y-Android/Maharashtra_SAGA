@@ -1,7 +1,4 @@
-const axios = require('axios');
 const blugateClient = require('./blugateClient');
-
-const FACEBOOK_BASE = `${blugateClient.GATEWAY_BASE}/facebook`;
 
 // Simple in-memory cooldown to handle BluGate 429s gracefully (single client key — no rotation).
 const fbState = {
@@ -116,12 +113,13 @@ const markRateLimited = (retryAfterSeconds) => {
 const rapidGet = async (path, params) => {
     ensureNotCoolingDown();
     try {
-        return await blugateClient.withRateLimitRetry(() => axios.get(`${FACEBOOK_BASE}${path}`, {
-            params: blugateClient.cleanParams(params),
-            headers: blugateClient.getHeaders(),
+        // BluGate first, the provider directly when the fallback is on. call() already
+        // retries a BluGate 429 in place when there is no fallback, so no outer retry here.
+        return await blugateClient.call('facebook', {
+            path,
+            params,
             timeout: 20000,
-            ...blugateClient.responseOptions(),
-        }), { retries: 1, label: 'BluGate Facebook' });
+        });
     } catch (error) {
         const status = error?.response?.status;
 
